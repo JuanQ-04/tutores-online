@@ -3,10 +3,644 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>TutoresOn-Line</title>
+
+  <link rel="stylesheet" href="#">
 </head>
+
 <body>
-  <h1>TutoresOn-Line</h1>
-  <p>Plataforma de tutorías en línea.</p>
+
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="0"
+    height="0"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <defs>
+      <symbol id="icon-search" viewBox="0 0 24 24">
+        <circle cx="10.5" cy="10.5" r="7.5"></circle>
+        <path d="m16 16 5 5"></path>
+      </symbol>
+
+      <symbol id="icon-arrow-right" viewBox="0 0 24 24">
+        <path d="M4 12h16M13 5l7 7-7 7"></path>
+      </symbol>
+
+      <symbol id="icon-chevron-down" viewBox="0 0 24 24">
+        <path d="m6 9 6 6 6-6"></path>
+      </symbol>
+
+      <symbol id="icon-chevron-right" viewBox="0 0 24 24">
+        <path d="m9 6 6 6-6 6"></path>
+      </symbol>
+
+      <symbol id="icon-book" viewBox="0 0 24 24">
+        <path d="M12 5v16"></path>
+        <path d="M12 5C9 3 6 3 3 4v15c3-1 6-1 9 2"></path>
+        <path d="M12 5c3-2 6-2 9-1v15c-3-1-6-1-9 2"></path>
+      </symbol>
+
+      <symbol id="icon-calendar" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+        <path d="M7 3v4M17 3v4M3 10h18"></path>
+        <path d="M7 14h2M12 14h2M17 14h1M7 18h2M12 18h2"></path>
+      </symbol>
+
+      <symbol id="icon-video" viewBox="0 0 24 24">
+        <rect x="3" y="6" width="12" height="12" rx="2"></rect>
+        <path d="m15 10 6-4v12l-6-4"></path>
+      </symbol>
+
+      <symbol id="icon-laptop" viewBox="0 0 24 24">
+        <rect x="5" y="3" width="14" height="13" rx="1"></rect>
+        <path d="M5 16 2 21h20l-3-5"></path>
+      </symbol>
+
+      <symbol id="icon-map-pin" viewBox="0 0 24 24">
+        <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"></path>
+        <circle cx="12" cy="10" r="3"></circle>
+      </symbol>
+
+      <symbol id="icon-check-circle" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="m8 12 3 3 5-6"></path>
+      </symbol>
+
+      <symbol id="icon-sparkles" viewBox="0 0 24 24">
+        <path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"></path>
+        <path d="M20 2v4M18 4h4"></path>
+      </symbol>
+    </defs>
+  </svg>
+
+  <div class="landing-page">
+
+    <!-- 1. Barra superior -->
+    <header class="landing-nav">
+
+      <a href="index.html" class="brand brand-lockup">
+        <img
+          src="images/logo.webp"
+          alt=""
+          class="brand-mark"
+          width="28"
+          height="28"
+        >
+
+        <span>Tutores<span>On-Line</span></span>
+      </a>
+
+      <nav class="landing-links" aria-label="Navegación principal">
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#modalidades">Modalidades</a>
+
+        <a href="pages/registro.html">Para tutores</a>
+      </nav>
+
+      <div class="landing-actions">
+        <a href="pages/login.html" class="text-button">
+          Iniciar sesión
+        </a>
+
+        <a href="pages/registro.html" class="button button-primary">
+          Crear cuenta
+        </a>
+      </div>
+
+    </header>
+
+    <main>
+
+      <!-- 2. Presentación principal -->
+      <section class="landing-hero" aria-labelledby="hero-title">
+
+        <div class="hero-copy">
+
+          <span class="hero-kicker">
+            <svg
+              class="icon"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <use href="#icon-sparkles"></use>
+            </svg>
+
+            Aprender acompañado cambia todo
+          </span>
+
+          <h1 id="hero-title">
+            Encuentra a la persona indicada para
+            <em>avanzar hoy.</em>
+          </h1>
+
+          <p>
+            Conecta con tutores que entienden tu ritmo, tu objetivo
+            y la forma en que mejor aprendes.
+          </p>
+
+          <div class="hero-actions">
+
+            <a href="#buscar-tutor" class="button button-primary">
+              <svg
+                class="icon"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <use href="#icon-search"></use>
+              </svg>
+
+              Buscar un tutor
+            </a>
+
+            <a href="#como-funciona" class="play-link">
+
+              <span class="play-circle">
+                <svg
+                  class="icon"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <use href="#icon-arrow-right"></use>
+                </svg>
+              </span>
+
+              Conoce cómo funciona
+            </a>
+
+          </div>
+
+          <!-- Contenido de demostración -->
+          <div class="hero-proof">
+
+            <div class="avatar-stack">
+              <img
+                src="images/tutor-maria.webp"
+                alt="María"
+                class="avatar avatar-sm"
+                width="32"
+                height="32"
+              >
+
+              <img
+                src="images/tutor-diego.webp"
+                alt="Diego"
+                class="avatar avatar-sm"
+                width="32"
+                height="32"
+              >
+
+              <img
+                src="images/tutor-ines.webp"
+                alt="Inés"
+                class="avatar avatar-sm"
+                width="32"
+                height="32"
+              >
+
+              <span class="avatar-more" aria-hidden="true">+</span>
+            </div>
+
+            <div class="hero-proof-copy">
+              <span
+                class="stars"
+                role="img"
+                aria-label="Cinco estrellas, muestra del prototipo"
+              >
+                ★★★★★
+              </span>
+
+              <p>Más de 100 sesiones acompañadas</p>
+            </div>
+
+          </div>
+
+        </div>
+
+        <div class="hero-visual">
+
+          <img
+            src="images/hero.webp"
+            alt="Mesa de estudio con una tableta para videollamada, un cuaderno y un bolígrafo"
+            class="hero-image"
+            fetchpriority="high"
+          >
+
+          <!-- Aviso superior: ejemplo visual, no una reserva real. -->
+          <div class="hero-note note-top">
+
+            <span
+              class="note-dot turquoise"
+              aria-hidden="true"
+            ></span>
+
+            <div class="hero-note-copy">
+              <b>Tu próximo paso</b>
+              <span>Sesión confirmada</span>
+            </div>
+
+            <svg
+              class="icon"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <use href="#icon-check-circle"></use>
+            </svg>
+
+          </div>
+
+          <!-- Aviso inferior: fecha y materia de ejemplo del boceto. -->
+          <div class="hero-note note-bottom">
+
+            <div class="mini-calendar">
+              <span>AGO</span>
+              <b>28</b>
+            </div>
+
+            <div class="hero-note-copy">
+              <b>Matemáticas</b>
+              <span>Mié · 4:00 PM</span>
+            </div>
+
+            <svg
+              class="icon"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <use href="#icon-chevron-right"></use>
+            </svg>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- 3. Barra de búsqueda -->
+      <section
+        id="buscar-tutor"
+        class="quick-search-section"
+        aria-labelledby="quick-search-title"
+      >
+
+        <!--
+          El formulario queda preparado en HTML.
+          La página de resultados y la consulta se implementarán después.
+        -->
+        <form
+          class="quick-search"
+          action="pages/buscar.html"
+          method="get"
+        >
+
+          <div class="quick-search-title">
+
+            <span class="search-orb">
+              <svg
+                class="icon"
+                width="20"
+                height="20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <use href="#icon-search"></use>
+              </svg>
+            </span>
+
+            <div>
+              <h2 id="quick-search-title">¿Qué quieres aprender?</h2>
+              <p>Empieza por una materia o un objetivo.</p>
+            </div>
+
+          </div>
+
+          <div class="quick-field">
+
+            <svg
+              class="icon"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <use href="#icon-book"></use>
+            </svg>
+
+            <select
+              id="materia"
+              name="materia"
+              aria-label="Buscar por materia"
+            >
+              <option value="">Buscar por materia</option>
+              <option value="matematicas">Matemáticas</option>
+              <option value="fisica">Física</option>
+              <option value="ingles">Inglés</option>
+            </select>
+
+          </div>
+
+          <div class="quick-field">
+
+            <svg
+              class="icon"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <use href="#icon-calendar"></use>
+            </svg>
+
+            <label for="disponibilidad">
+              Cuándo tienes disponibilidad
+            </label>
+
+            <input
+              type="date"
+              id="disponibilidad"
+              name="disponibilidad"
+            >
+
+          </div>
+
+          <button
+            type="submit"
+            class="button button-primary quick-search-button"
+          >
+            Ver tutores
+
+            <svg
+              class="icon"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <use href="#icon-arrow-right"></use>
+            </svg>
+          </button>
+
+        </form>
+
+      </section>
+
+      <!-- 4. Cómo funciona -->
+      <section
+        class="landing-section"
+        id="como-funciona"
+        aria-labelledby="como-funciona-title"
+      >
+
+        <div class="section-intro">
+          <span class="eyebrow">Una experiencia clara</span>
+
+          <h2 id="como-funciona-title">
+            Del primer clic a la primera sesión, sin perderte.
+          </h2>
+
+          <p>
+            Todo lo importante aparece en el momento justo:
+            perfil, disponibilidad, modalidad y próximos pasos.
+          </p>
+        </div>
+
+        <div class="steps-grid">
+
+          <article class="step-card">
+            <span class="step-number">01</span>
+
+            <svg
+              class="icon step-icon"
+              width="24"
+              height="24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <use href="#icon-search"></use>
+            </svg>
+
+            <h3>Busca con intención</h3>
+
+            <p>
+              Filtra por materia, nivel, modalidad y disponibilidad.
+            </p>
+          </article>
+
+          <article class="step-card featured">
+            <span class="step-number">02</span>
+
+            <svg
+              class="icon step-icon"
+              width="24"
+              height="24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <use href="#icon-calendar"></use>
+            </svg>
+
+            <h3>Elige tu momento</h3>
+
+            <p>
+              Revisa horarios reales y reserva el espacio
+              que mejor te funciona.
+            </p>
+          </article>
+
+          <article class="step-card">
+            <span class="step-number">03</span>
+
+            <svg
+              class="icon step-icon"
+              width="24"
+              height="24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <use href="#icon-video"></use>
+            </svg>
+
+            <h3>Aprende acompañado</h3>
+
+            <p>
+              Conéctate virtualmente o encuentra un lugar acordado.
+            </p>
+          </article>
+
+        </div>
+
+      </section>
+
+      <!-- 5. Modalidades -->
+      <section
+        class="landing-section modalities"
+        id="modalidades"
+        aria-labelledby="modalidades-title"
+      >
+
+        <div class="section-intro">
+          <span class="eyebrow">Dos formas de encontrarse</span>
+
+          <h2 id="modalidades-title">
+            La modalidad que se adapta a tu manera de aprender.
+          </h2>
+        </div>
+
+        <div class="modality-grid">
+
+          <article class="modality-card modality-virtual">
+
+            <div class="modality-icon">
+              <svg
+                class="icon"
+                width="24"
+                height="24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <use href="#icon-laptop"></use>
+              </svg>
+            </div>
+
+            <div class="modality-copy">
+              <h3>Virtual</h3>
+
+              <p>
+                Aprende desde donde estés,
+                con un enlace listo para tu sesión.
+              </p>
+
+              <a href="pages/buscar.html?modalidad=virtual">
+                Explorar sesiones virtuales
+
+                <svg
+                  class="icon"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <use href="#icon-arrow-right"></use>
+                </svg>
+              </a>
+            </div>
+
+          </article>
+
+          <article class="modality-card modality-presencial">
+
+            <div class="modality-icon">
+              <svg
+                class="icon"
+                width="24"
+                height="24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <use href="#icon-map-pin"></use>
+              </svg>
+            </div>
+
+            <div class="modality-copy">
+              <h3>Presencial</h3>
+
+              <p>
+                Acuerda un lugar y una experiencia cercana,
+                dentro de tu zona.
+              </p>
+
+              <a href="pages/buscar.html?modalidad=presencial">
+                Buscar cerca de mí
+
+                <svg
+                  class="icon"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <use href="#icon-arrow-right"></use>
+                </svg>
+              </a>
+            </div>
+
+          </article>
+
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- 6. Pie de página -->
+    <footer class="landing-footer">
+
+      <a href="index.html" class="brand brand-lockup">
+        <img
+          src="img/logo.png"
+          alt=""
+          class="brand-mark"
+          width="28"
+          height="28"
+          loading="lazy"
+        >
+
+        <span>Tutores<span>On-Line</span></span>
+      </a>
+
+      <p>
+        Aprender mejor también es encontrar
+        el acompañamiento correcto.
+      </p>
+
+      <p>© 2026 TutoresOn-Line</p>
+
+    </footer>
+
+  </div>
+
 </body>
 </html>
