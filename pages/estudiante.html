@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Panel del estudiante de TutoresOn-Line">
+  <title>Inicio | TutoresOn-Line</title>
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/estudiante-inicio.css">
+</head>
+
+<body>
+  <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
+
+  <!-- Iconos reutilizables -->
+  <svg xmlns="http://www.w3.org/2000/svg" hidden aria-hidden="true">
+    <symbol id="icon-menu" viewBox="0 0 24 24">
+      <path d="M4 6h16M4 12h16M4 18h16"></path>
+    </symbol>
+
+    <symbol id="icon-close" viewBox="0 0 24 24">
+      <path d="m6 6 12 12M18 6 6 18"></path>
+    </symbol>
+
+    <symbol id="icon-home" viewBox="0 0 24 24">
+      <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1z"></path>
+    </symbol>
+
+    <symbol id="icon-search" viewBox="0 0 24 24">
+      <circle cx="10.5" cy="10.5" r="7"></circle>
+      <path d="m16 16 5 5"></path>
+    </symbol>
+
+    <symbol id="icon-calendar" viewBox="0 0 24 24">
+      <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+      <path d="M16 3v4M8 3v4M3 10h18"></path>
+    </symbol>
+
+    <symbol id="icon-bell" viewBox="0 0 24 24">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+      <path d="M10 21h4"></path>
+    </symbol>
+
+    <symbol id="icon-user" viewBox="0 0 24 24">
+      <circle cx="12" cy="8" r="4"></circle>
+      <path d="M4 21a8 8 0 0 1 16 0"></path>
+    </symbol>
+
+    <symbol id="icon-help" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"></circle>
+      <path d="M9.6 9a2.5 2.5 0 1 1 4.3 1.8c-1.1 1-1.9 1.3-1.9 3"></path>
+      <path d="M12 17h.01"></path>
+    </symbol>
+
+    <symbol id="icon-settings" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.6a8 8 0 0 1-1.7 1l-.3 1.8h-2.8l-.3-1.8a8 8 0 0 1-1.7-1l-1.7.6-1.4-2.4 1.4-1.1a7 7 0 0 1 0-2l-1.4-1.1 1.4-2.4 1.7.6a8 8 0 0 1 1.7-1l.3-1.8h2.8l.3 1.8a8 8 0 0 1 1.7 1l1.7-.6 1.4 2.4-1.4 1.1a7 7 0 0 1 0 2z"></path>
+    </symbol>
+
+    <symbol id="icon-arrow-right" viewBox="0 0 24 24">
+      <path d="M4 12h16M13 5l7 7-7 7"></path>
+    </symbol>
+
+    <symbol id="icon-clock" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"></circle>
+      <path d="M12 7v5l3 2"></path>
+    </symbol>
+
+    <symbol id="icon-video" viewBox="0 0 24 24">
+      <rect x="3" y="6" width="12" height="12" rx="2"></rect>
+      <path d="m15 10 6-4v12l-6-4z"></path>
+    </symbol>
+
+    <symbol id="icon-heart" viewBox="0 0 24 24">
+      <path d="M20.8 8.8c0 5.4-8.8 11-8.8 11s-8.8-5.6-8.8-11A4.8 4.8 0 0 1 12 6.3a4.8 4.8 0 0 1 8.8 2.5z"></path>
+    </symbol>
+  </svg>
+
+  <div class="student-dashboard">
+    <!-- Panel lateral -->
+    <aside
+      class="sidebar"
+      id="student-sidebar"
+      aria-label="Menú principal del estudiante"
+    >
+      <div class="sidebar-header">
+        <a class="brand" href="../index.html" aria-label="TutoresOn-Line, inicio">
+          <img
+            src="../images/logo.webp"
+            alt=""
+            class="brand-mark"
+            width="28"
+            height="28"
+          >
+          <span class="brand-name">Tutores<span>On-Line</span></span>
+        </a>
+
+        <button
+          class="sidebar-close"
+          type="button"
+          aria-label="Cerrar menú"
+          aria-controls="student-sidebar"
+        >
+          <svg class="icon" aria-hidden="true">
+            <use href="#icon-close"></use>
+          </svg>
+        </button>
+      </div>
+
+      <div class="workspace-card">
+        <span class="workspace-label">Espacio de trabajo</span>
+        <span class="workspace-role">Estudiante</span>
+      </div>
+
+      <nav class="main-navigation" aria-label="Secciones del estudiante">
+        <a href="#inicio" aria-current="page">
+          <svg class="icon" aria-hidden="true">
+            <use href="#icon-home"></use>
+          </svg>
+          <span>Inicio</span>
+        </a>
+
+        <a href="#buscar">
+          <svg class="icon" aria-hidden="true">
+            <use href="#icon-search"></use>
+          </svg>
+          <span>Buscar tutores</span>
+        </a>
+
+        <a href="#tutorias">
+          <svg class="icon" aria-hidden="true">
+            <use href="#icon-calendar"></use>
+          </svg>
+          <span>Mis tutorías</span>
+        </a>
+
+        <a href="#notificaciones">
+          <svg class="icon" aria-hidden="true">
+            <use href="#icon-bell"></use>
+          </svg>
+          <span>Notificaciones</span>
+          <span class="navigation-badge" aria-label="2 notificaciones sin leer">2</span>
+        </a>
+
+        <a href="#perfil">
+          <svg class="icon" aria-hidden="true">
+            <use href="#icon-user"></use>
+          </svg>
+          <span>Mi perfil</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <a class="help-card" href="#ayuda">
+          <svg class="icon" aria-hidden="true">
+            <use href="#icon-help"></use>
+          </svg>
+          <span>
+            <strong>¿Necesitas ayuda?</strong>
+            <small>Estamos para acompañarte</small>
+          </span>
+        </a>
+
+        <a class="secondary-navigation-link" href="#configuracion">
+          <svg class="icon" aria-hidden="true">
+            <use href="#icon-settings"></use>
+          </svg>
+          <span>Configuración</span>
+        </a>
+
+        <a class="secondary-navigation-link" href="../index.html">
+          <span aria-hidden="true">↗</span>
+          <span>Salir del prototipo</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Fondo que cubrirá el contenido al abrir el menú móvil -->
+    <button
+      class="sidebar-overlay"
+      type="button"
+      aria-label="Cerrar menú"
+      tabindex="-1"
+      hidden
+    ></button>
+
+    <div class="dashboard-content">
+      <!-- Barra superior -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button
+            class="menu-toggle"
+            type="button"
+            aria-label="Abrir menú"
+            aria-expanded="false"
+            aria-controls="student-sidebar"
+          >
+            <svg class="icon" aria-hidden="true">
+              <use href="#icon-menu"></use>
+            </svg>
+          </button>
+
+          <nav class="breadcrumb" aria-label="Ruta de navegación">
+            <span>TutoresOn-Line</span>
+            <span aria-hidden="true">›</span>
+            <span aria-current="page">Inicio</span>
+          </nav>
+        </div>
+
+        <div class="topbar-actions">
+
+          <a
+            class="topbar-notifications"
+            href="#notificaciones"
+            aria-label="Notificaciones, 2 sin leer"
+          >
+            <svg class="icon" aria-hidden="true">
+              <use href="#icon-bell"></use>
+            </svg>
+            <span class="notification-dot" aria-hidden="true">2</span>
+          </a>
+
+          <button class="user-avatar" type="button" aria-label="Perfil de Sofía">
+            SP
+          </button>
+        </div>
+      </header>
+
+      <main class="dashboard-main" id="contenido-principal">
+        <section class="student-home" id="inicio" aria-labelledby="page-title">
+          <p class="demo-notice">
+            Vista de demostración: la información mostrada es de ejemplo.
+          </p>
+
+          <div class="welcome-row">
+            <div>
+              <p class="eyebrow">Mi espacio de aprendizaje</p>
+              <h1 id="page-title">Buenos días, Sofía</h1>
+              <p class="welcome-description">
+                Organiza tus tutorías y sigue avanzando en tus metas.
+              </p>
+            </div>
+
+            <a class="primary-button" href="#buscar">
+              <svg class="icon" aria-hidden="true">
+                <use href="#icon-search"></use>
+              </svg>
+              <span>Buscar un tutor</span>
+            </a>
+          </div>
+
+          <div class="dashboard-grid">
+            <!-- Próxima tutoría -->
+            <section
+              class="upcoming-card"
+              aria-labelledby="upcoming-title"
+            >
+              <div class="card-heading">
+                <div>
+                  <p class="card-eyebrow">Tu agenda</p>
+                  <h2 id="upcoming-title">Próxima tutoría</h2>
+                </div>
+                <span class="status-badge status-confirmed">Confirmada</span>
+              </div>
+
+              <div class="lesson-content">
+                <div class="lesson-date" aria-label="Miércoles 28 de agosto">
+                  <span>AGO</span>
+                  <strong>28</strong>
+                  <span>MIÉ</span>
+                </div>
+
+                <div class="lesson-information">
+                  <p class="lesson-subject">Matemáticas</p>
+                  <h3>Repaso de ecuaciones</h3>
+                  <p class="lesson-tutor">Con María Rodríguez</p>
+
+                  <ul class="lesson-details">
+                    <li>
+                      <svg class="icon" aria-hidden="true">
+                        <use href="#icon-clock"></use>
+                      </svg>
+                      <span>4:00 p. m. – 5:00 p. m.</span>
+                    </li>
+                    <li>
+                      <svg class="icon" aria-hidden="true">
+                        <use href="#icon-video"></use>
+                      </svg>
+                      <span>Sesión virtual</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div class="tutor-avatar" aria-label="Iniciales de María Rodríguez">
+                  MR
+                </div>
+              </div>
+
+              <p class="lesson-reminder">
+                El enlace de la sesión estará disponible 15 minutos antes.
+              </p>
+
+              <a class="card-action" href="#tutorias">
+                <span>Ver detalle</span>
+                <svg class="icon" aria-hidden="true">
+                  <use href="#icon-arrow-right"></use>
+                </svg>
+              </a>
+            </section>
+
+            <!-- Resumen semanal -->
+            <section class="week-card" aria-labelledby="week-title">
+              <div class="card-heading">
+                <div>
+                  <p class="card-eyebrow">Resumen</p>
+                  <h2 id="week-title">Tu semana</h2>
+                </div>
+                <button class="more-button" type="button" aria-label="Más opciones">
+                  <span aria-hidden="true">•••</span>
+                </button>
+              </div>
+
+              <div class="week-summary">
+                <div>
+                  <strong class="week-count">2</strong>
+                  <span>tutorías</span>
+                </div>
+
+                <div
+                  class="progress-ring"
+                  role="img"
+                  aria-label="68 por ciento de progreso semanal"
+                >
+                  <span>68%</span>
+                </div>
+              </div>
+
+              <div class="progress-track" aria-hidden="true">
+                <span class="progress-value"></span>
+              </div>
+
+              <p class="week-caption">de tu meta semanal completada</p>
+            </section>
+
+            <!-- Solicitud pendiente -->
+            <section
+              class="pending-card"
+              aria-labelledby="pending-title"
+            >
+              <div class="card-heading">
+                <div>
+                  <p class="card-eyebrow">Seguimiento</p>
+                  <h2 id="pending-title">Solicitud pendiente</h2>
+                </div>
+                <span class="status-badge status-pending">En revisión</span>
+              </div>
+
+              <div class="pending-content">
+                <span class="pending-subject">Física</span>
+                <p>Nivelación</p>
+                <span class="pending-update">Estamos esperando respuesta del tutor.</span>
+              </div>
+
+              <a class="text-link" href="#tutorias">
+                Ver mis solicitudes
+                <svg class="icon" aria-hidden="true">
+                  <use href="#icon-arrow-right"></use>
+                </svg>
+              </a>
+            </section>
+          </div>
+
+          <!-- Recomendaciones -->
+          <section class="recommendations" aria-labelledby="recommendations-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Seleccionados para ti</p>
+                <h2 id="recommendations-title">
+                  Tutores que pueden ayudarte
+                </h2>
+                <p>Recomendaciones de ejemplo para esta demostración.</p>
+              </div>
+
+              <a class="text-link" href="#buscar">
+                Ver todos
+                <svg class="icon" aria-hidden="true">
+                  <use href="#icon-arrow-right"></use>
+                </svg>
+              </a>
+            </div>
+
+            <div class="recommendation-list">
+              <article class="recommendation-card">
+                <div class="recommendation-avatar" aria-hidden="true">MA</div>
+                <div class="recommendation-information">
+                  <p class="recommendation-subject">Matemáticas</p>
+                  <h3>Tutor de matemáticas</h3>
+                  <p>Apoyo para repasar y practicar temas.</p>
+                </div>
+                <button
+                  class="favorite-button"
+                  type="button"
+                  aria-label="Guardar recomendación de matemáticas"
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#icon-heart"></use>
+                  </svg>
+                </button>
+              </article>
+
+              <article class="recommendation-card">
+                <div class="recommendation-avatar" aria-hidden="true">FI</div>
+                <div class="recommendation-information">
+                  <p class="recommendation-subject">Física</p>
+                  <h3>Tutor de física</h3>
+                  <p>Apoyo para resolver ejercicios y dudas.</p>
+                </div>
+                <button
+                  class="favorite-button"
+                  type="button"
+                  aria-label="Guardar recomendación de física"
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#icon-heart"></use>
+                  </svg>
+                </button>
+              </article>
+
+              <article class="recommendation-card">
+                <div class="recommendation-avatar" aria-hidden="true">IN</div>
+                <div class="recommendation-information">
+                  <p class="recommendation-subject">Inglés</p>
+                  <h3>Tutor de inglés</h3>
+                  <p>Apoyo para practicar y fortalecer conocimientos.</p>
+                </div>
+                <button
+                  class="favorite-button"
+                  type="button"
+                  aria-label="Guardar recomendación de inglés"
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#icon-heart"></use>
+                  </svg>
+                </button>
+              </article>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,583 @@
+/* ====
+   css/dashboard.css — Estructura compartida del panel
+   ==== */
+
+/* 1. Estructura general */
+
+.student-dashboard,
+.student-dashboard *,
+.student-dashboard *::before,
+.student-dashboard *::after {
+  box-sizing: border-box;
+}
+
+.student-dashboard {
+  min-height: 100vh;
+  min-height: 100dvh;
+
+  color: var(--color-primary);
+  background-color: #f7f9fa;
+}
+
+.student-dashboard a {
+  text-decoration: none;
+}
+
+.student-dashboard button,
+.student-dashboard input,
+.student-dashboard select,
+.student-dashboard textarea {
+  font: inherit;
+}
+
+.student-dashboard button {
+  cursor: pointer;
+}
+
+.student-dashboard button:disabled {
+  cursor: not-allowed;
+}
+
+/* El SVG de símbolos está fuera de .student-dashboard. */
+svg[hidden],
+.student-dashboard [hidden] {
+  display: none !important;
+}
+
+.student-dashboard .icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.student-dashboard a:focus-visible,
+.student-dashboard button:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 4px;
+}
+
+/* Acceso directo para navegación con teclado */
+
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+
+  padding: 12px 18px;
+  border-radius: 10px;
+
+  color: #ffff;
+  background-color: var(--color-primary);
+
+  transform: translateY(-180%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+/* 2. Panel lateral */
+
+.student-dashboard .sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 40;
+
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+
+  width: 260px;
+  height: 100vh;
+  height: 100dvh;
+  padding: 28px 20px 22px;
+
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  border-right: 1px solid var(--color-border);
+  background-color: var(--color-bg-surface, #ffff);
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.student-dashboard .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+
+  color: var(--color-primary);
+}
+
+.student-dashboard .brand-mark {
+  display: block;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 0;
+  background-color: transparent;
+}
+
+.student-dashboard .brand-name {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  white-space: nowrap;
+}
+
+.student-dashboard .brand-name > span {
+  color: var(--color-accent);
+}
+
+/* Solo se mostrará en pantallas pequeñas */
+
+.sidebar-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  padding: 0;
+
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  color: var(--color-primary);
+  background-color: transparent;
+}
+
+/* 3. Identificación del espacio */
+
+.workspace-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 16px;
+
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background-color: #f6f8fa;
+}
+
+.workspace-label {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.workspace-role {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* 4. Navegación */
+
+.main-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.main-navigation > a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  min-height: 48px;
+  padding: 12px 14px;
+
+  border-radius: 12px;
+  color: var(--color-text-muted);
+
+  font-size: 14px;
+  font-weight: 600;
+
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.main-navigation > a:hover {
+  color: var(--color-primary);
+  background-color: #f3f6f8;
+}
+
+.main-navigation > a[aria-current="page"] {
+  color: var(--color-accent);
+  background-color: var(--color-primary-light, #e8f5f4);
+}
+
+.navigation-badge {
+  display: grid;
+  place-items: center;
+
+  min-width: 23px;
+  height: 23px;
+  margin-left: auto;
+  padding-inline: 5px;
+
+  border-radius: 8px;
+  color: #ffff;
+  background-color: var(--color-accent);
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* 5. Ayuda y opciones inferiores */
+
+.sidebar-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 24px;
+}
+
+.help-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px 12px;
+
+  border: 1px solid #f0e5c8;
+  border-radius: 14px;
+  color: var(--color-primary);
+  background-color: #fff9e9;
+}
+
+.help-card > .icon {
+  margin-top: 2px;
+  color: #a67d2e;
+}
+
+.help-card strong,
+.help-card small {
+  display: block;
+}
+
+.help-card strong {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.help-card small {
+  margin-top: 5px;
+
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.secondary-navigation-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  padding: 9px 14px;
+
+  border-radius: 10px;
+  color: var(--color-text-muted);
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.secondary-navigation-link:hover {
+  color: var(--color-primary);
+  background-color: #f3f6f8;
+}
+
+/* 6. Contenido y barra superior */
+
+.dashboard-content {
+  min-width: 0;
+  min-height: 100vh;
+  margin-left: 260px;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+
+  min-height: 76px;
+  padding: 14px 34px;
+
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-bg-surface, #ffff);
+}
+
+.topbar-left,
+.topbar-actions {
+  display: flex;
+  align-items: center;
+}
+
+.topbar-left {
+  gap: 14px;
+  min-width: 0;
+}
+
+.topbar-actions {
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.breadcrumb > [aria-current="page"] {
+  overflow: hidden;
+
+  color: var(--color-primary);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  padding: 0;
+
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  color: var(--color-primary);
+  background-color: transparent;
+}
+
+.public-view-button {
+  padding: 8px 12px;
+
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  color: var(--color-text-muted);
+  background-color: transparent;
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.topbar-notifications {
+  position: relative;
+
+  display: grid;
+  place-items: center;
+
+  width: 40px;
+  height: 40px;
+
+  border-radius: 10px;
+  color: var(--color-primary);
+}
+
+.topbar-notifications:hover {
+  background-color: #f3f6f8;
+}
+
+.notification-dot {
+  position: absolute;
+  top: 0;
+  right: 0;
+
+  display: grid;
+  place-items: center;
+
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 3px;
+
+  border: 2px solid #ffff;
+  border-radius: 50%;
+  color: #ffff;
+  background-color: var(--color-accent);
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.user-avatar {
+  display: grid;
+  place-items: center;
+
+  width: 38px;
+  height: 38px;
+  padding: 0;
+
+  border: 1px solid #d9e7e8;
+  border-radius: 50%;
+  color: var(--color-primary);
+  background-color: #eaf1f2;
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* 7. Área principal */
+
+.dashboard-main {
+  width: 100%;
+  min-width: 0;
+  padding: 34px;
+
+  background-image:
+    linear-gradient(rgba(25, 57, 73, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(25, 57, 73, 0.025) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.demo-notice {
+  margin: 0 0 24px;
+  padding: 10px 14px;
+
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-surface, #ffff);
+
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* 8. Capa del menú móvil */
+
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+
+  width: 100%;
+  height: 100%;
+  padding: 0;
+
+  border: 0;
+  background-color: rgba(15, 31, 43, 0.4);
+}
+
+/*
+   Estas clases se activarán con JavaScript:
+   .is-open en el panel
+   .sidebar-open en el body
+*/
+
+@media (max-width: 1000px) {
+  .student-dashboard .sidebar {
+    width: min(300px, 85vw);
+
+    visibility: hidden;
+    transform: translateX(-100%);
+
+    transition:
+      transform 220ms ease,
+      visibility 220ms ease;
+  }
+
+  .student-dashboard .sidebar.is-open {
+    visibility: visible;
+    transform: translateX(0);
+  }
+
+  .sidebar-close,
+  .menu-toggle {
+    display: flex;
+  }
+
+  .dashboard-content {
+    margin-left: 0;
+  }
+
+  .topbar {
+    padding-inline: 24px;
+  }
+
+  .dashboard-main {
+    padding: 28px 24px;
+  }
+
+  body.sidebar-open {
+    overflow: hidden;
+  }
+}
+
+@media (min-width: 1001px) {
+  .student-dashboard .sidebar-overlay {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .topbar {
+    min-height: 68px;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  .topbar-left {
+    gap: 10px;
+  }
+
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .breadcrumb {
+    gap: 8px;
+  }
+
+  .breadcrumb > span:first-child,
+  .public-view-button,
+  .topbar-actions > .user-avatar {
+    display: none;
+  }
+
+  .dashboard-main {
+    padding: 24px 16px 32px;
+  }
+
+  .demo-notice {
+    margin-bottom: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .student-dashboard .sidebar,
+  .student-dashboard a {
+    transition: none;
+  }
+}
