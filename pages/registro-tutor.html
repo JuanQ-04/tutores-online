@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Solicitud de tutor — TutoresOn-Line</title>
+
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/auth.css">
+  <script src="../js/registro-tutor.js" defer></script>
+</head>
+
+<body class="auth-body">
+
+  <!-- Iconos de la página -->
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="0"
+    height="0"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <defs>
+      <symbol id="icon-arrow-left" viewBox="0 0 24 24">
+        <path d="m12 19-7-7 7-7M5 12h14"></path>
+      </symbol>
+
+      <symbol id="icon-arrow-right" viewBox="0 0 24 24">
+        <path d="M5 12h14M12 5l7 7-7 7"></path>
+      </symbol>
+
+      <symbol id="icon-sparkles" viewBox="0 0 24 24">
+        <path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"></path>
+        <path d="M20 2v4M18 4h4"></path>
+      </symbol>
+
+      <symbol id="icon-check-circle" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="m8 12 3 3 5-6"></path>
+      </symbol>
+    </defs>
+  </svg>
+
+  <!-- 1. Barra superior -->
+  <header class="auth-header">
+    <a href="../index.html" class="brand brand-lockup">
+      <img
+        src="../images/logo.webp"
+        alt=""
+        class="brand-mark"
+        width="28"
+        height="28"
+      >
+      <span>Tutores<span>On-Line</span></span>
+    </a>
+
+    <a href="registro.html" class="auth-back-link">
+      <svg
+        class="icon"
+        width="16"
+        height="16"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <use href="#icon-arrow-left"></use>
+      </svg>
+
+      Volver al registro
+    </a>
+  </header>
+
+  <main class="auth-container">
+
+    <!-- 2. Panel informativo -->
+    <aside class="auth-banner">
+      <div class="auth-banner-top">
+        <span class="auth-badge-sparkle">
+          <svg
+            class="icon"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <use href="#icon-sparkles"></use>
+          </svg>
+        </span>
+      </div>
+
+      <div class="auth-banner-copy">
+        <span class="auth-kicker">AULA SERENA</span>
+
+        <h2>Comparte lo que sabes.</h2>
+
+        <p>
+          Cuéntanos tu formación, tus materias y cómo prefieres
+          dar tus tutorías. Un administrador revisará tu solicitud.
+        </p>
+
+        <!-- Decoración del boceto, no un carrusel funcional -->
+        <div class="auth-slider-dots" aria-hidden="true">
+          <span class="dot"></span>
+          <span class="dot active"></span>
+          <span class="dot"></span>
+        </div>
+      </div>
+
+      <div class="auth-banner-footer">
+        <svg
+          class="icon"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <use href="#icon-check-circle"></use>
+        </svg>
+
+        <span>
+          Solo los tutores aprobados aparecerán en las búsquedas
+          y podrán recibir reservas.
+        </span>
+      </div>
+    </aside>
+
+    <!-- 3. Formulario de solicitud -->
+    <section class="auth-card" aria-labelledby="tutor-title">
+      <div class="auth-card-intro">
+        <span class="auth-kicker">PASO 2 DE 2</span>
+
+        <h1 id="tutor-title">Tu perfil profesional.</h1>
+
+        <p>
+          Completa la información que verá el administrador
+          para evaluar tu solicitud.
+        </p>
+      </div>
+
+      <form id="tutor-form" class="auth-form" novalidate>
+
+        <!-- Formación -->
+        <fieldset class="form-section">
+          <legend>Formación</legend>
+
+          <div class="form-group">
+            <label for="titulo">Carrera o formación principal</label>
+
+            <input
+                type="text"
+                id="titulo"
+                name="titulo"
+                list="carreras-opciones"
+                placeholder="Escribe para buscar, por ejemplo: ing"
+                maxlength="80"
+                autocomplete="off"
+                required
+        >
+
+            <datalist id="carreras-opciones">
+                <option value="Ingeniería de Sistemas">
+                <option value="Ingeniería de Software">
+                <option value="Ingeniería Industrial">
+                <option value="Ingeniería Civil">
+                <option value="Ingeniería Electrónica">
+                <option value="Ingeniería de Telecomunicaciones">
+                <option value="Ingeniería Ambiental">
+                <option value="Ingeniería Química">
+                <option value="Administración de Empresas">
+                <option value="Contaduría Pública">
+                <option value="Economía">
+                <option value="Negocios Internacionales">
+                <option value="Mercadeo y Publicidad">
+                <option value="Medicina">
+                <option value="Enfermería">
+                <option value="Odontología">
+                <option value="Derecho">
+                <option value="Psicología">
+                <option value="Comunicación Social">
+                <option value="Trabajo Social">
+                <option value="Diseño Gráfico">
+            </datalist>
+
+            <small class="auth-form-note">
+                Escribe para ver sugerencias y selecciona una opción del catálogo.
+            </small>
+          </div>
+
+          <div class="auth-form-row">
+            <div class="form-group">
+              <label for="nivel-estudios">Nivel de estudios</label>
+
+              <select id="nivel-estudios" name="nivel-estudios" required>
+                <option value="">Selecciona una opción</option>
+                <option value="tecnico">Técnico o tecnólogo</option>
+                <option value="pregrado-curso">Pregrado en curso</option>
+                <option value="pregrado">Pregrado finalizado</option>
+                <option value="posgrado">Posgrado</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="institucion">Institución</label>
+
+              <input
+                type="text"
+                id="institucion"
+                name="institucion"
+                placeholder="Nombre de tu institución"
+                maxlength="80"
+                required
+              >
+            </div>
+          </div>
+        </fieldset>
+
+        <!-- Materias y niveles -->
+        <fieldset class="form-section">
+          <legend>¿Qué quieres enseñar?</legend>
+
+          <div class="check-grid" role="group" aria-label="Materias">
+            <label class="check-option">
+              <input type="checkbox" name="materias" value="matematicas">
+              <span>Matemáticas</span>
+            </label>
+
+            <label class="check-option">
+              <input type="checkbox" name="materias" value="fisica">
+              <span>Física</span>
+            </label>
+
+            <label class="check-option">
+              <input type="checkbox" name="materias" value="quimica">
+              <span>Química</span>
+            </label>
+
+            <label class="check-option">
+              <input type="checkbox" name="materias" value="programacion">
+              <span>Programación</span>
+            </label>
+
+            <label class="check-option">
+              <input type="checkbox" name="materias" value="idiomas">
+              <span>Idiomas</span>
+            </label>
+
+            <label class="check-option">
+              <input type="checkbox" name="materias" value="estadistica">
+              <span>Estadística</span>
+            </label>
+          </div>
+
+          <small id="materias-help" class="auth-form-note">
+            Selecciona al menos una materia.
+          </small>
+
+          <div class="form-group">
+            <label for="nivel-ensenanza">Nivel al que enseñas</label>
+
+            <select id="nivel-ensenanza" name="nivel-ensenanza" required>
+              <option value="">Selecciona una opción</option>
+              <option value="secundaria">Secundaria</option>
+              <option value="universitario">Universitario</option>
+              <option value="ambos">Secundaria y universitario</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="experiencia">Años de experiencia enseñando</label>
+
+            <input
+              type="number"
+              id="experiencia"
+              name="experiencia"
+              min="0"
+              max="60"
+              step="1"
+              placeholder="0"
+              required
+            >
+          </div>
+        </fieldset>
+
+        <!-- Modalidad y tarifa -->
+        <fieldset class="form-section">
+          <legend>Modalidad y tarifa</legend>
+
+          <div class="account-type-options">
+            <label class="account-type-option">
+              <input type="radio" name="modalidad" value="virtual" checked required>
+              <span><strong>Virtual</strong></span>
+            </label>
+
+            <label class="account-type-option">
+              <input type="radio" name="modalidad" value="presencial" required>
+              <span><strong>Presencial</strong></span>
+            </label>
+
+            <label class="account-type-option">
+              <input type="radio" name="modalidad" value="ambas" required>
+              <span><strong>Ambas</strong></span>
+            </label>
+          </div>
+
+          <div class="auth-form-row">
+            <div class="form-group">
+              <label for="ciudad">Ciudad</label>
+
+              <input
+                type="text"
+                id="ciudad"
+                name="ciudad"
+                placeholder="Ej.: Barranquilla"
+                maxlength="60"
+                autocomplete="address-level2"
+                required
+              >
+            </div>
+
+            <div class="form-group">
+              <label for="tarifa">Tarifa por hora (COP)</label>
+
+              <input
+                type="number"
+                id="tarifa"
+                name="tarifa"
+                min="1000"
+                step="1000"
+                placeholder="30000"
+                required
+              >
+            </div>
+          </div>
+        </fieldset>
+
+        <!-- Disponibilidad -->
+        <fieldset class="form-section">
+          <legend>Disponibilidad general</legend>
+
+          <div class="check-grid" role="group" aria-label="Franjas horarias">
+            <label class="check-option">
+              <input type="checkbox" name="franjas" value="manana">
+              <span>Mañana</span>
+            </label>
+
+            <label class="check-option">
+              <input type="checkbox" name="franjas" value="tarde">
+              <span>Tarde</span>
+            </label>
+
+            <label class="check-option">
+              <input type="checkbox" name="franjas" value="noche">
+              <span>Noche</span>
+            </label>
+          </div>
+
+          <small id="franjas-help" class="auth-form-note">
+            Selecciona al menos una franja. Después podrás
+            detallar tu agenda en la sección de disponibilidad.
+          </small>
+        </fieldset>
+
+        <!-- Presentación y documento -->
+        <fieldset class="form-section">
+          <legend>Presentación</legend>
+
+          <div class="form-group">
+            <label for="presentacion">Cuéntales a los estudiantes quién eres</label>
+
+            <textarea
+              id="presentacion"
+              name="presentacion"
+              rows="5"
+              maxlength="500"
+              placeholder="Cómo enseñas, qué experiencia tienes y qué pueden esperar de tus tutorías."
+              aria-describedby="presentacion-count"
+              required
+            ></textarea>
+
+            <small id="presentacion-count" class="auth-form-note">
+              0 / 500 caracteres
+            </small>
+          </div>
+
+          <div class="form-group">
+            <label for="hoja-vida">Hoja de vida o soporte (PDF, obligatorio)</label>
+
+            <input
+              type="file"
+              id="hoja-vida"
+              name="hoja-vida"
+              accept="application/pdf"
+              aria-describedby="hoja-vida-help"
+              required
+              aria-describedby="hoja-vida-help"
+            >
+
+            <small id="hoja-vida-help" class="auth-form-note">
+              En esta maqueta el archivo no se sube ni se guarda.
+            </small>
+          </div>
+        </fieldset>
+
+        <label class="auth-terms" for="declaracion">
+          <input
+            type="checkbox"
+            id="declaracion"
+            name="declaracion"
+            required
+          >
+
+          <span>
+            Declaro que la información es verídica y entiendo que
+            mi solicitud debe ser aprobada por un administrador.
+          </span>
+        </label>
+
+        <button
+          type="submit"
+          id="btn-enviar-solicitud"
+          class="button button-primary button-full"
+          aria-describedby="tutor-demo-note"
+        >
+          <span>Enviar solicitud</span>
+
+          <svg
+            class="icon"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <use href="#icon-arrow-right"></use>
+          </svg>
+        </button>
+
+        <p id="tutor-demo-note" class="auth-form-note">
+          Vista de demostración: no se guardan datos ni se envían solicitudes.
+        </p>
+      </form>
+
+      <footer class="auth-card-footer">
+        <span>¿Ya tienes una cuenta?</span>
+        <a href="login.html" class="link-bold">Iniciar sesión</a>
+      </footer>
+    </section>
+
+  </main>
+
+</body>
+</html>

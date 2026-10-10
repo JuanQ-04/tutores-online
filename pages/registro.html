@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Crear cuenta — TutoresOn-Line</title>
+
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/auth.css">
+  <script src="../js/registro.js" defer></script>
+</head>
+
+<body class="auth-body">
+
+  <!-- Iconos de la página -->
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="0"
+    height="0"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <defs>
+      <symbol id="icon-arrow-left" viewBox="0 0 24 24">
+        <path d="m12 19-7-7 7-7M5 12h14"></path>
+      </symbol>
+
+      <symbol id="icon-arrow-right" viewBox="0 0 24 24">
+        <path d="M5 12h14M12 5l7 7-7 7"></path>
+      </symbol>
+
+      <symbol id="icon-sparkles" viewBox="0 0 24 24">
+        <path
+          d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"
+        ></path>
+        <path d="M20 2v4M18 4h4"></path>
+      </symbol>
+
+      <symbol id="icon-check-circle" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="m8 12 3 3 5-6"></path>
+      </symbol>
+    </defs>
+  </svg>
+
+  <!-- 1. Barra superior -->
+  <header class="auth-header">
+    <a href="../index.html" class="brand brand-lockup">
+      <img
+        src="../images/logo.webp"
+        alt=""
+        class="brand-mark"
+        width="28"
+        height="28"
+      >
+      <span>Tutores<span>On-Line</span></span>
+    </a>
+
+    <a href="../index.html" class="auth-back-link">
+      <svg
+        class="icon"
+        width="16"
+        height="16"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <use href="#icon-arrow-left"></use>
+      </svg>
+
+      Volver al inicio
+    </a>
+  </header>
+
+  <main class="auth-container">
+
+    <!-- 2. Panel informativo -->
+    <aside class="auth-banner">
+      <div class="auth-banner-top">
+        <span class="auth-badge-sparkle">
+          <svg
+            class="icon"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <use href="#icon-sparkles"></use>
+          </svg>
+        </span>
+      </div>
+
+      <div class="auth-banner-copy">
+        <span class="auth-kicker">AULA SERENA</span>
+
+        <h2>Tu siguiente paso empieza aquí.</h2>
+
+        <p>
+          Arma una experiencia a tu medida: materia,
+          disponibilidad y la forma en que mejor aprendes.
+        </p>
+
+        <!-- Decoración del boceto, no un carrusel funcional -->
+        <div class="auth-slider-dots" aria-hidden="true">
+          <span class="dot active"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </div>
+
+      <div class="auth-banner-footer">
+        <svg
+          class="icon"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <use href="#icon-check-circle"></use>
+        </svg>
+
+        <span>
+          Tu información queda lista para que puedas
+          concentrarte en aprender.
+        </span>
+      </div>
+    </aside>
+
+    <!-- 3. Datos básicos del registro -->
+    <section class="auth-card" aria-labelledby="registro-title">
+      <div class="auth-card-intro">
+        <span class="auth-kicker">EMPIEZA CON INTENCIÓN</span>
+
+        <h1 id="registro-title">Crea tu espacio.</h1>
+
+        <p>
+          Elige cómo quieres participar y completa tus datos.
+        </p>
+      </div>
+
+      <form id="registro-form" class="auth-form">
+
+        <!-- Selección pública: nunca incluye Administrador -->
+        <fieldset class="account-type">
+          <legend>¿Cómo quieres participar?</legend>
+
+          <div class="account-type-options">
+            <label class="account-type-option">
+              <input
+                type="radio"
+                name="tipo-cuenta"
+                value="estudiante"
+                checked
+                required
+                aria-describedby="registro-role-help"
+              >
+
+              <span>
+                <strong>Estudiante</strong>
+                <span>Quiero aprender</span>
+              </span>
+            </label>
+
+            <label class="account-type-option">
+              <input
+                type="radio"
+                name="tipo-cuenta"
+                value="tutor"
+                required
+                aria-describedby="registro-role-help"
+              >
+
+              <span>
+                <strong>Tutor</strong>
+                <span>Quiero enseñar</span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <p id="registro-role-help" class="auth-form-note">
+          Si eliges Tutor, completarás tu información profesional
+          en el siguiente paso. Tu solicitud deberá ser aprobada
+          por un administrador antes de ofrecer tutorías.
+        </p>
+
+        <div class="auth-form-row">
+          <div class="form-group">
+            <label for="nombre">Nombre</label>
+
+            <input
+              type="text"
+              id="nombre"
+              name="nombre"
+              placeholder="Sofía"
+              autocomplete="given-name"
+              required
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="apellido">Apellido</label>
+
+            <input
+              type="text"
+              id="apellido"
+              name="apellido"
+              placeholder="Pérez"
+              autocomplete="family-name"
+              required
+            >
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Correo electrónico</label>
+
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="tu@correo.com"
+            autocomplete="email"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="password">Crea una contraseña</label>
+
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Mínimo 8 caracteres"
+            autocomplete="new-password"
+            minlength="8"
+            aria-describedby="password-help"
+            required
+          >
+
+          <small id="password-help" class="auth-form-note">
+            Usa al menos 8 caracteres.
+          </small>
+        </div>
+
+        <label class="auth-terms" for="acepta-terminos">
+          <input
+            type="checkbox"
+            id="acepta-terminos"
+            name="acepta-terminos"
+            required
+          >
+
+          <span>
+            Acepto los términos de uso y la política de privacidad.
+          </span>
+        </label>
+
+        <!-- Pendiente: JavaScript de interfaz e integración con Firebase -->
+        <button
+          type="button"
+          id="btn-registro"
+          class="button button-primary button-full"
+          aria-describedby="registro-demo-note"
+          disabled
+        >
+          <span>Continuar</span>
+
+          <svg
+            class="icon"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <use href="#icon-arrow-right"></use>
+          </svg>
+        </button>
+
+        <p id="registro-demo-note" class="auth-form-note">
+          Formulario en desarrollo. Por ahora no se crean cuentas
+          ni se envían solicitudes.
+        </p>
+      </form>
+
+      <footer class="auth-card-footer">
+        <span>¿Ya tienes una cuenta?</span>
+        <a href="login.html" class="link-bold">Iniciar sesión</a>
+      </footer>
+    </section>
+
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,615 @@
+/* ==========================================================================
+   css/auth.css — Vistas de Login y Registro
+   ========================================================================== */
+
+.auth-body {
+  min-height: 100vh;
+  background-color: #f7fafc;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 1. Header simplificado */
+.auth-header {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.auth-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.auth-back-link:hover {
+  color: var(--color-primary);
+}
+
+/* 2. Contenedor de dos columnas */
+.auth-container {
+  max-width: 1060px;
+  width: 100%;
+  margin: auto;
+  padding: 16px 24px 48px;
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 40px;
+  align-items: stretch;
+}
+
+/* 3. Banner lateral izquierdo (Azul marino) */
+.auth-banner {
+  background: linear-gradient(160deg, #163b65 0%, #0d2542 100%);
+  border-radius: 28px 80px 28px 28px;
+  padding: 44px 36px;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(13, 37, 66, 0.16);
+}
+
+/* Ondas decorativas de fondo */
+.auth-banner::after {
+  content: "";
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16, 166, 166, 0.25) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.auth-badge-sparkle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: #ffffff;
+  color: var(--color-primary);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.auth-kicker {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #1cd4d4;
+  margin-bottom: 12px;
+}
+
+.auth-banner-copy h2 {
+  font-size: 32px;
+  line-height: 1.15;
+  color: #ffffff;
+  margin-bottom: 14px;
+}
+
+.auth-banner-copy p {
+  color: #b3c7db;
+  font-size: 14px;
+  line-height: 1.55;
+  margin-bottom: 24px;
+}
+
+.auth-slider-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.auth-slider-dots .dot {
+  width: 8px;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.auth-slider-dots .dot.active {
+  width: 22px;
+  background: #1cd4d4;
+}
+
+.auth-banner-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: #b3c7db;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.auth-banner-footer .icon {
+  color: #1cd4d4;
+  flex-shrink: 0;
+}
+
+/* 4. Tarjeta del formulario (Derecha) */
+.auth-card {
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 48px 44px;
+  box-shadow: 0 12px 36px rgba(29, 59, 88, 0.06);
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.auth-card-intro h1 {
+  font-size: 36px;
+  color: var(--color-primary);
+  margin-top: 6px;
+  margin-bottom: 8px;
+  line-height: 1.15;
+}
+
+.auth-card-intro p {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  margin-bottom: 28px;
+}
+
+/* Formulario */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.form-group input {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--color-text);
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(16, 166, 166, 0.15);
+}
+
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.btn-toggle-password {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.form-forgot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -6px;
+}
+
+.forgot-link {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
+}
+
+.button-full {
+  width: 100%;
+  height: 48px;
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+/* Separador "o continúa con" */
+.auth-divider {
+  position: relative;
+  text-align: center;
+  margin: 24px 0 18px;
+}
+
+.auth-divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.auth-divider span {
+  position: relative;
+  background: #ffffff;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* Botón de Google */
+.button-google {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  color: var(--color-primary);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background 0.15s ease;
+}
+
+.button-google:hover {
+  background: #f8fafc;
+}
+
+/* Footer de la tarjeta */
+.auth-card-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.auth-card-footer .link-bold {
+  color: var(--color-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-card-footer .link-bold:hover {
+  text-decoration: underline;
+}
+
+/* Alerta de errores */
+.auth-alert {
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+/* Adaptación responsive */
+@media (max-width: 900px) {
+  .auth-container {
+    grid-template-columns: 1fr;
+    max-width: 500px;
+  }
+  .auth-banner {
+    display: none; /* En pantallas pequeñas se prioriza directamente el formulario */
+  }
+  .auth-card {
+    padding: 36px 28px;
+  }
+}
+
+/* 5. Elementos adicionales del registro */
+
+/* Color del subtítulo sobre la tarjeta blanca */
+.auth-card-intro > .auth-kicker {
+  color: var(--color-accent);
+}
+
+/* Selector de tipo de cuenta */
+:is(#registro-form, #tutor-form) .account-type {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+:is(#registro-form, #tutor-form) .account-type legend {
+  margin-bottom: 10px;
+  padding: 0;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+:is(#registro-form, #tutor-form) .account-type-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+:is(#registro-form, #tutor-form) .account-type-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  min-width: 0;
+  margin: 0;
+  padding: 14px 12px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-surface);
+  cursor: pointer;
+}
+
+:is(#registro-form, #tutor-form) .account-type-option > input {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--color-accent);
+}
+
+:is(#registro-form, #tutor-form) .account-type-option strong,
+:is(#registro-form, #tutor-form) .account-type-option > span > span {
+  display: block;
+}
+
+:is(#registro-form, #tutor-form) .account-type-option strong {
+  color: var(--color-primary);
+  font-size: 13px;
+}
+
+:is(#registro-form, #tutor-form) .account-type-option > span > span {
+  margin-top: 3px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* Resaltar la opción seleccionada */
+:is(#registro-form, #tutor-form) .account-type-option:has(input:checked) {
+  border-color: var(--color-accent);
+  background-color: var(--color-primary-light);
+}
+
+/* Indicador al navegar con el teclado */
+:is(#registro-form, #tutor-form) .account-type-option:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* Nombre y apellido en dos columnas */
+:is(#registro-form, #tutor-form) .auth-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+:is(#registro-form, #tutor-form) .auth-form-row > .form-group {
+  min-width: 0;
+}
+
+/* Textos de ayuda */
+:is(#registro-form, #tutor-form) .auth-form-note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Aceptación de términos */
+:is(#registro-form, #tutor-form) .auth-terms {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+:is(#registro-form, #tutor-form) .auth-terms > input {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: var(--color-accent);
+}
+
+/* Estado provisional: todavía no se puede continuar */
+#btn-registro:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Registro en celulares estrechos */
+@media (max-width: 480px) {
+  :is(#registro-form, #tutor-form) .account-type-options,
+  :is(#registro-form, #tutor-form) .auth-form-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 6. Formulario de solicitud de tutor */
+
+/* Bloques del formulario */
+#tutor-form .form-section {
+  display: grid;
+  gap: 16px;
+
+  min-width: 0;
+  margin: 0;
+  padding: 18px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+#tutor-form .form-section > legend {
+  padding: 0 8px;
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#tutor-form .form-group {
+  min-width: 0;
+}
+
+/* Select, área de texto, número y archivo, con el aspecto de los campos de texto */
+#tutor-form select,
+#tutor-form textarea,
+#tutor-form input[type="number"],
+#tutor-form input[type="file"] {
+  width: 100%;
+  padding: 12px 14px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background-color: var(--color-bg-surface);
+
+  font: inherit;
+  font-size: 14px;
+}
+
+#tutor-form select {
+  cursor: pointer;
+}
+
+#tutor-form textarea {
+  min-height: 120px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+#tutor-form input[type="file"] {
+  padding: 10px;
+  cursor: pointer;
+}
+
+#tutor-form select:focus,
+#tutor-form textarea:focus,
+#tutor-form input[type="number"]:focus,
+#tutor-form input[type="file"]:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Casillas de materias y franjas */
+#tutor-form .check-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#tutor-form .check-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-surface);
+
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#tutor-form .check-option > input {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
+#tutor-form .check-option:has(input:checked) {
+  border-color: var(--color-accent);
+  background-color: var(--color-primary-light);
+}
+
+#tutor-form .check-option:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* Modalidad: tres opciones en una fila */
+#tutor-form .account-type-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Estado de error, que usará el JavaScript */
+#tutor-form [aria-invalid="true"] {
+  border-color: var(--color-danger, #b3261e);
+}
+
+/* Formulario en pantallas estrechas */
+@media (max-width: 640px) {
+  #tutor-form .check-grid,
+  #tutor-form .account-type-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  #tutor-form .form-section {
+    padding: 14px;
+  }
+
+  #tutor-form .check-grid,
+  #tutor-form .account-type-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
