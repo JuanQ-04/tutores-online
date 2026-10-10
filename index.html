@@ -6,7 +6,9 @@
 
   <title>TutoresOn-Line</title>
 
-  <link rel="stylesheet" href="#">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/landing.css">
 </head>
 
 <body>
@@ -91,23 +93,39 @@
 
         <span>Tutores<span>On-Line</span></span>
       </a>
+      <button
 
-      <nav class="landing-links" aria-label="Navegación principal">
-        <a href="#como-funciona">Cómo funciona</a>
-        <a href="#modalidades">Modalidades</a>
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="menu-principal"
+        aria-label="Abrir menú"
+      >
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+      </button>
+      
+      <div class="landing-menu" id="menu-principal">
 
-        <a href="pages/registro.html">Para tutores</a>
-      </nav>
+        <nav class="landing-links" aria-label="Navegación principal">
+            <a href="#como-funciona">Cómo funciona</a>
+            <a href="#modalidades">Modalidades</a>
 
-      <div class="landing-actions">
-        <a href="pages/login.html" class="text-button">
-          Iniciar sesión
-        </a>
+            <a href="pages/registro.html">Para tutores</a>
+        </nav>
 
-        <a href="pages/registro.html" class="button button-primary">
-          Crear cuenta
-        </a>
-      </div>
+        <div class="landing-actions">
+            <a href="pages/login.html" class="text-button">
+            Iniciar sesión
+            </a>
+
+            <a href="pages/registro.html" class="button button-primary">
+            Crear cuenta
+            </a>
+        </div>
+    
+    </div>
 
     </header>
 
@@ -378,10 +396,6 @@
               <use href="#icon-calendar"></use>
             </svg>
 
-            <label for="disponibilidad">
-              Cuándo tienes disponibilidad
-            </label>
-
             <input
               type="date"
               id="disponibilidad"
@@ -641,6 +655,8 @@
     </footer>
 
   </div>
+
+  <script src="js/landing.js"></script>
 
 </body>
 </html>

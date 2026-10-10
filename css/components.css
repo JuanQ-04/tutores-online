@@ -1,0 +1,178 @@
+/* ==========================================================================
+   css/components.css — Elementos reutilizables
+   ========================================================================== */
+
+/* 1. Íconos
+   Conservan las dimensiones indicadas en el HTML y no se encogen
+   cuando comparten una fila con texto.
+*/
+.icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* 2. Marca */
+.brand {
+  color: var(--color-primary);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* El texto completo mantiene el azul.
+   Solo "On-Line", en el span interior, lleva el color de acento.
+*/
+.brand > span {
+  color: var(--color-primary);
+}
+
+.brand > span > span {
+  color: var(--color-accent);
+}
+
+.brand-mark {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+/* 3. Botones
+   La clase .button define su forma.
+   La clase .button-primary define su variante de color.
+*/
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  min-height: 40px;
+  max-width: 100%;
+  padding: 10px 18px;
+
+  border: 0;
+  border-radius: 9px;
+
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  text-decoration: none;
+
+  cursor: pointer;
+
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.button-primary {
+  color: var(--color-bg-surface);
+  background-color: var(--color-primary);
+}
+
+@media (hover: hover) {
+  .button-primary:not(:disabled):hover {
+    background-color: var(--color-primary-hover);
+  }
+}
+
+.button-primary:not(:disabled):active {
+  background-color: var(--color-primary-hover);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Enlace de acción sin fondo, como "Iniciar sesión". */
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.text-button:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* 4. Controles del buscador
+   Limitamos estas reglas al formulario .quick-search:
+   no afectan indiscriminadamente a todos los campos del sitio.
+*/
+.quick-search label {
+  display: block;
+  margin-bottom: 6px;
+
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.quick-search input,
+.quick-search select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+
+  color: var(--color-text-main);
+  background-color: var(--color-bg-surface);
+
+  font-size: 13px;
+  line-height: 1.5;
+
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.quick-search input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+.quick-search select {
+  cursor: pointer;
+}
+
+.quick-search input:hover,
+.quick-search select:hover {
+  border-color: var(--color-text-muted);
+}
+
+.quick-search input:focus,
+.quick-search select:focus {
+  border-color: var(--color-border-focus);
+}
+
+/* 5. Preferencia de movimiento reducido */
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .quick-search input,
+  .quick-search select {
+    transition: none;
+  }
+}
