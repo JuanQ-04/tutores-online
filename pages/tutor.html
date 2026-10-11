@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Panel del tutor de TutoresOn-Line">
+  <title>Inicio | TutoresOn-Line</title>
+
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+
+  <link rel="stylesheet" href="../css/tutor.css">
+  <link rel="stylesheet" href="../css/tutor-inicio.css">
+  <link rel="stylesheet" href="../css/tutor-solicitudes.css">
+  <link rel="stylesheet" href="../css/tutor-disponibilidad.css">
+  <link rel="stylesheet" href="../css/tutor-tutorias.css">
+
+  <script src="../js/tutor.js" defer></script>
+</head>
+
+<body class="tutor-panel">
+  <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
+
+  <!-- Iconos exclusivos de esta página -->
+  <svg xmlns="http://www.w3.org/2000/svg" hidden aria-hidden="true">
+    <symbol id="t-menu" viewBox="0 0 24 24">
+      <path d="M4 6h16M4 12h16M4 18h16"></path>
+    </symbol>
+    <symbol id="t-close" viewBox="0 0 24 24">
+      <path d="m6 6 12 12M18 6 6 18"></path>
+    </symbol>
+    <symbol id="t-home" viewBox="0 0 24 24">
+      <path d="m3 10 9-7 9 7v10h-6v-7H9v7H3z"></path>
+    </symbol>
+    <symbol id="t-calendar" viewBox="0 0 24 24">
+      <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+      <path d="M8 3v4M16 3v4M3 10h18"></path>
+    </symbol>
+    <symbol id="t-clock" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"></circle>
+      <path d="M12 7v5l3 2"></path>
+    </symbol>
+    <symbol id="t-book" viewBox="0 0 24 24">
+      <path d="M12 5v16M12 5C9 3 6 3 3 4v15c3-1 6-1 9 2M12 5c3-2 6-2 9-1v15c-3-1-6-1-9 2"></path>
+    </symbol>
+    <symbol id="t-video" viewBox="0 0 24 24">
+      <rect x="3" y="6" width="12" height="12" rx="2"></rect>
+      <path d="m15 10 6-4v12l-6-4z"></path>
+    </symbol>
+    <symbol id="t-bell" viewBox="0 0 24 24">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"></path>
+    </symbol>
+    <symbol id="t-check" viewBox="0 0 24 24">
+      <path d="m5 12 5 5 9-10"></path>
+    </symbol>
+    <symbol id="t-plus" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14"></path>
+    </symbol>
+    <symbol id="t-arrow" viewBox="0 0 24 24">
+      <path d="M4 12h16M13 5l7 7-7 7"></path>
+    </symbol>
+    <symbol id="t-chevron" viewBox="0 0 24 24">
+      <path d="m9 6 6 6-6 6"></path>
+    </symbol>
+    <symbol id="t-settings" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"></path>
+    </symbol>
+    <symbol id="t-help" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"></circle>
+      <path d="M9.6 9a2.5 2.5 0 1 1 4.3 1.8c-1.1 1-1.9 1.3-1.9 3M12 17h.01"></path>
+    </symbol>
+    <symbol id="t-requests" viewBox="0 0 24 24">
+      <path d="M5 6h14M5 12h10M5 18h6"></path>
+    </symbol>
+    <symbol id="t-star" viewBox="0 0 24 24">
+      <path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path>
+    </symbol>
+    <symbol id="t-pin" viewBox="0 0 24 24">
+      <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0z"></path>
+      <circle cx="12" cy="10" r="3"></circle>
+    </symbol>
+  </svg>
+
+  <div class="student-dashboard">
+    <aside class="sidebar" id="tutor-sidebar" aria-label="Menú del tutor">
+      <div class="sidebar-header">
+        <a class="brand" href="../index.html" aria-label="TutoresOn-Line, inicio">
+          <img
+            src="../images/logo.webp"
+            alt=""
+            class="brand-mark"
+            width="28"
+            height="28"
+          >
+          <span class="brand-name">Tutores<span>On-Line</span></span>
+        </a>
+
+        <button
+          class="sidebar-close"
+          type="button"
+          aria-label="Cerrar menú"
+          aria-controls="tutor-sidebar"
+        >
+          <svg class="icon" aria-hidden="true"><use href="#t-close"></use></svg>
+        </button>
+      </div>
+
+      <div class="workspace-card">
+        <span class="workspace-label">Espacio de trabajo</span>
+        <span class="workspace-role">Tutor</span>
+      </div>
+
+      <nav class="main-navigation" aria-label="Secciones del tutor">
+        <a href="#inicio" aria-current="page">
+          <svg class="icon" aria-hidden="true"><use href="#t-home"></use></svg>
+          <span>Inicio</span>
+        </a>
+        <a href="#solicitudes">
+          <svg class="icon" aria-hidden="true"><use href="#t-requests"></use></svg>
+          <span>Solicitudes</span>
+        </a>
+        <a href="#disponibilidad">
+          <svg class="icon" aria-hidden="true"><use href="#t-calendar"></use></svg>
+          <span>Disponibilidad</span>
+        </a>
+        <a href="#tutorias">
+          <svg class="icon" aria-hidden="true"><use href="#t-book"></use></svg>
+          <span>Mis tutorías</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <button class="help-card tutor-pending-link" type="button" data-pending="Centro de ayuda">
+          <svg class="icon" aria-hidden="true"><use href="#t-help"></use></svg>
+          <span>
+            <strong>¿Necesitas ayuda?</strong>
+            <small>Estamos para acompañarte</small>
+          </span>
+        </button>
+
+        <button class="secondary-navigation-link tutor-pending-link" type="button" data-pending="Configuración">
+          <svg class="icon" aria-hidden="true"><use href="#t-settings"></use></svg>
+          <span>Configuración</span>
+        </button>
+      </div>
+    </aside>
+
+    <button
+      class="sidebar-overlay"
+      type="button"
+      aria-label="Cerrar menú"
+      tabindex="-1"
+      hidden
+    ></button>
+
+    <div class="dashboard-content">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button
+            class="menu-toggle"
+            type="button"
+            aria-label="Abrir menú"
+            aria-expanded="false"
+            aria-controls="tutor-sidebar"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#t-menu"></use></svg>
+          </button>
+
+          <nav class="breadcrumb" aria-label="Ruta de navegación">
+            <span>TutoresOn-Line</span>
+            <span aria-hidden="true">›</span>
+            <span aria-current="page" id="tutor-breadcrumb">Inicio</span>
+          </nav>
+        </div>
+
+        <div class="topbar-actions">
+
+          <div class="tutor-notification-widget">
+            <button
+              class="tutor-bell"
+              id="tutor-notification-toggle"
+              type="button"
+              aria-label="Notificaciones"
+              aria-expanded="false"
+              aria-controls="tutor-notification-dropdown"
+            >
+              <svg class="icon" aria-hidden="true"><use href="#t-bell"></use></svg>
+              <span class="tutor-notification-count" id="tutor-notification-count" aria-hidden="true"></span>
+            </button>
+
+            <div class="tutor-notification-dropdown" id="tutor-notification-dropdown" hidden>
+              <h2>Notificaciones recientes</h2>
+              <ul class="tutor-notification-list" id="tutor-notification-preview"></ul>
+              <a class="tutor-text-link" href="#notificaciones">Ver todas</a>
+            </div>
+          </div>
+
+          <a class="user-avatar" id="tutor-top-avatar" href="#perfil" aria-label="Mi perfil, María">
+            MR
+          </a>
+        </div>
+      </header>
+
+      <main class="dashboard-main" id="contenido-principal">
+        <!-- Inicio -->
+        <section id="inicio" aria-labelledby="tutor-home-title">
+          <p class="demo-notice">
+            Demostración: los datos y las fechas son de ejemplo.
+            Los cambios se mantienen solo mientras esta página esté abierta.
+          </p>
+
+          <div class="tutor-page-heading">
+            <div>
+              <p class="tutor-eyebrow">Tu espacio profesional</p>
+              <h1 id="tutor-home-title">Hola, María</h1>
+              <p id="tutor-home-description">Organiza tus solicitudes y tu agenda.</p>
+            </div>
+            <a class="tutor-button" href="#disponibilidad">
+              <svg class="icon" aria-hidden="true"><use href="#t-calendar"></use></svg>
+              Gestionar disponibilidad
+            </a>
+          </div>
+
+          <div class="tutor-stats">
+            <article class="tutor-stat">
+              <span class="tutor-stat-icon">
+                <svg class="icon" aria-hidden="true"><use href="#t-requests"></use></svg>
+              </span>
+              <div>
+                <p class="tutor-label">Solicitudes nuevas</p>
+                <strong id="tutor-stat-requests">0</strong>
+                <small>Esperan tu respuesta</small>
+              </div>
+            </article>
+
+            <article class="tutor-stat">
+              <span class="tutor-stat-icon is-amber">
+                <svg class="icon" aria-hidden="true"><use href="#t-clock"></use></svg>
+              </span>
+              <div>
+                <p class="tutor-label">Próxima sesión de ejemplo</p>
+                <strong id="tutor-stat-next">—</strong>
+                <small id="tutor-stat-subject">Sin sesiones confirmadas</small>
+              </div>
+            </article>
+
+            <article class="tutor-stat">
+              <span class="tutor-stat-icon is-blue">
+                <svg class="icon" aria-hidden="true"><use href="#t-star"></use></svg>
+              </span>
+              <div>
+                <p class="tutor-label">Calificación de ejemplo</p>
+                <strong>4.9 / 5</strong>
+                <small>38 opiniones de demostración</small>
+              </div>
+            </article>
+          </div>
+
+          <div class="tutor-home-grid">
+            <section class="tutor-surface" aria-labelledby="recent-requests-title">
+              <div class="tutor-section-heading">
+                <div>
+                  <p class="tutor-eyebrow">Requieren tu respuesta</p>
+                  <h2 id="recent-requests-title">Solicitudes recientes</h2>
+                </div>
+                <a class="tutor-text-link" href="#solicitudes">
+                  Ver todas
+                  <svg class="icon" aria-hidden="true"><use href="#t-arrow"></use></svg>
+                </a>
+              </div>
+              <div id="tutor-recent-requests"></div>
+            </section>
+
+            <section class="tutor-surface" aria-labelledby="availability-summary-title">
+              <div class="tutor-section-heading">
+                <div>
+                  <p class="tutor-eyebrow">Semana de ejemplo</p>
+                  <h2 id="availability-summary-title">Tu disponibilidad</h2>
+                </div>
+                <a class="tutor-icon-button" href="#disponibilidad" aria-label="Gestionar disponibilidad">
+                  <svg class="icon" aria-hidden="true"><use href="#t-settings"></use></svg>
+                </a>
+              </div>
+              <div class="tutor-week-summary" id="tutor-week-summary"></div>
+              <p class="tutor-summary-caption" id="tutor-hours-summary"></p>
+            </section>
+          </div>
+
+          <section class="tutor-upcoming" aria-labelledby="home-sessions-title">
+            <div class="tutor-section-heading">
+              <div>
+                <p class="tutor-eyebrow">Tu agenda</p>
+                <h2 id="home-sessions-title">Sesiones confirmadas</h2>
+              </div>
+              <a class="tutor-text-link" href="#tutorias">
+                Ver mis tutorías
+                <svg class="icon" aria-hidden="true"><use href="#t-arrow"></use></svg>
+              </a>
+            </div>
+            <div class="tutor-session-list" id="tutor-home-sessions"></div>
+          </section>
+        </section>
+
+        <!-- Solicitudes -->
+        <section id="solicitudes" aria-labelledby="requests-title" hidden>
+          <div class="tutor-page-heading">
+            <div>
+              <p class="tutor-eyebrow">Gestión de solicitudes</p>
+              <h1 id="requests-title">Nuevas oportunidades</h1>
+              <p>Responde a los estudiantes y organiza tu agenda con claridad.</p>
+            </div>
+          </div>
+
+          <div class="tutor-request-filters">
+            <label class="tutor-field">
+              <span>Buscar estudiante o materia</span>
+              <input id="tutor-request-search" type="search" placeholder="Nombre o materia">
+            </label>
+            <label class="tutor-field">
+              <span>Estado</span>
+              <select id="tutor-request-status">
+                <option value="pending">Nuevas</option>
+                <option value="confirmed">Aceptadas</option>
+                <option value="cancelled">Rechazadas</option>
+                <option value="all">Todas</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="tutor-request-grid" id="tutor-request-grid"></div>
+        </section>
+
+        <!-- Disponibilidad -->
+        <section id="disponibilidad" aria-labelledby="availability-title" hidden>
+          <div class="tutor-page-heading">
+            <div>
+              <p class="tutor-eyebrow">Tu agenda profesional</p>
+              <h1 id="availability-title">Disponibilidad</h1>
+              <p>Organiza bloques horarios de demostración.</p>
+            </div>
+            <button class="tutor-button" id="tutor-add-block" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#t-plus"></use></svg>
+              Agregar bloque
+            </button>
+          </div>
+
+          <div class="tutor-availability-layout">
+            <div class="tutor-surface tutor-calendar-card">
+              <div class="tutor-calendar-toolbar">
+                <button class="tutor-icon-button" id="tutor-previous-week" type="button" aria-label="Semana anterior">
+                  <span aria-hidden="true">‹</span>
+                </button>
+                <h2 id="tutor-week-title"></h2>
+                <button class="tutor-icon-button" id="tutor-next-week" type="button" aria-label="Semana siguiente">
+                  <span aria-hidden="true">›</span>
+                </button>
+              </div>
+
+              <p class="tutor-calendar-hint">
+                Vista semanal de 8:00 a. m. a 8:00 p. m.
+                En celular puedes deslizar el calendario.
+              </p>
+
+              <div
+                class="tutor-calendar-scroll"
+                tabindex="0"
+                role="region"
+                aria-label="Calendario semanal desplazable"
+              >
+                <div class="tutor-calendar" id="tutor-calendar"></div>
+              </div>
+            </div>
+
+            <aside class="tutor-surface tutor-calendar-aside" aria-labelledby="calendar-legend-title">
+              <h2 class="tutor-label" id="calendar-legend-title">Leyenda</h2>
+              <ul class="tutor-legend">
+                <li><span class="legend-dot available"></span>Disponible</li>
+                <li><span class="legend-dot reserved"></span>Reservado</li>
+              </ul>
+
+              <p class="tutor-calendar-note">
+                Estos bloques no se publican ni se guardan todavía.
+                Al recargar se restablecen los datos de ejemplo.
+              </p>
+
+              <h3 class="tutor-label">Bloques disponibles de esta semana</h3>
+              <ul class="tutor-block-list" id="tutor-block-list"></ul>
+            </aside>
+          </div>
+        </section>
+
+        <!-- Mis tutorías -->
+        <section id="tutorias" aria-labelledby="sessions-title" hidden>
+          <div class="tutor-page-heading">
+            <div>
+              <p class="tutor-eyebrow">Tu agenda</p>
+              <h1 id="sessions-title">Mis tutorías</h1>
+              <p>Consulta tus sesiones y responde a nuevas solicitudes.</p>
+            </div>
+            <a class="tutor-button" href="#disponibilidad">
+              <svg class="icon" aria-hidden="true"><use href="#t-plus"></use></svg>
+              Editar disponibilidad
+            </a>
+          </div>
+
+          <div class="tutor-session-tabs" role="group" aria-label="Filtrar tutorías por estado">
+            <button class="is-active" type="button" data-session-status="confirmed" aria-pressed="true">
+              Confirmadas <span data-session-count="confirmed"></span>
+            </button>
+            <button type="button" data-session-status="pending" aria-pressed="false">
+              Pendientes <span data-session-count="pending"></span>
+            </button>
+            <button type="button" data-session-status="completed" aria-pressed="false">
+              Completadas <span data-session-count="completed"></span>
+            </button>
+            <button type="button" data-session-status="cancelled" aria-pressed="false">
+              Canceladas <span data-session-count="cancelled"></span>
+            </button>
+          </div>
+
+          <p class="tutor-muted">
+            Se muestran sesiones de ejemplo; todavía no se filtran por la fecha actual.
+          </p>
+          <div class="tutor-session-list" id="tutor-session-list"></div>
+        </section>
+
+        <!-- Notificaciones -->
+        <section id="notificaciones" aria-labelledby="tutor-notifications-title" hidden>
+          <div class="tutor-page-heading">
+            <div>
+              <p class="tutor-eyebrow">Novedades</p>
+              <h1 id="tutor-notifications-title">Notificaciones</h1>
+              <p>Movimientos de tus solicitudes y sesiones de demostración.</p>
+            </div>
+            <button class="tutor-button is-outline" id="tutor-notifications-back" type="button">
+              Volver
+            </button>
+          </div>
+          <div class="tutor-surface">
+            <ul class="tutor-notification-list" id="tutor-notification-full"></ul>
+          </div>
+        </section>
+
+        <!-- Perfil -->
+        <section id="perfil" aria-labelledby="tutor-profile-title" hidden>
+          <div class="tutor-page-heading">
+            <div>
+              <p class="tutor-eyebrow">Tu cuenta</p>
+              <h1 id="tutor-profile-title">Mi perfil</h1>
+              <p>Mantén tu información profesional lista para tus estudiantes.</p>
+            </div>
+
+            <button class="tutor-button" type="submit" form="tutor-profile-form">
+              <svg class="icon" aria-hidden="true"><use href="#t-check"></use></svg>
+              Guardar cambios
+            </button>
+          </div>
+
+          <p class="demo-notice" id="tutor-profile-note" role="status" aria-live="polite">
+            Los cambios solo se reflejan en esta demostración.
+          </p>
+
+          <div class="tutor-profile-layout">
+            <form class="tutor-surface" id="tutor-profile-form">
+              <div class="tutor-profile-identity">
+                <span class="tutor-initials" id="tutor-profile-avatar" aria-hidden="true">MR</span>
+                <div>
+                  <h2 id="tutor-profile-name">María Rodríguez</h2>
+                  <p class="tutor-muted">Tutor · Perfil de demostración</p>
+                </div>
+              </div>
+
+              <div class="tutor-profile-fields">
+                <label class="tutor-field">
+                  <span>Nombre</span>
+                  <input id="tutor-name" type="text" value="María" autocomplete="given-name" maxlength="60" required>
+                </label>
+                <label class="tutor-field">
+                  <span>Apellido</span>
+                  <input id="tutor-lastname" type="text" value="Rodríguez" autocomplete="family-name" maxlength="60" required>
+                </label>
+                <label class="tutor-field tutor-field-full">
+                  <span>Correo electrónico</span>
+                  <input id="tutor-email" type="email" value="maria@correo.com" autocomplete="email" required>
+                </label>
+                <label class="tutor-field">
+                  <span>Ciudad</span>
+                  <input id="tutor-city" type="text" value="Bogotá" maxlength="80" required>
+                </label>
+                <label class="tutor-field">
+                  <span>Tarifa por hora (COP)</span>
+                  <input id="tutor-rate" type="number" value="30000" min="1000" step="1000" required>
+                </label>
+                <label class="tutor-field tutor-field-full">
+                  <span>Presentación</span>
+                  <textarea id="tutor-presentation" rows="4" maxlength="500" required>Te ayudo a entender lo que parecía difícil con ejemplos claros y un ritmo que se adapta a ti.</textarea>
+                </label>
+              </div>
+            </form>
+
+            <aside class="tutor-surface" aria-labelledby="tutor-preferences-title">
+              <h2 id="tutor-preferences-title">Preferencias</h2>
+              <div class="tutor-preferences">
+                <a href="#notificaciones">
+                  <svg class="icon" aria-hidden="true"><use href="#t-bell"></use></svg>
+                  <span>Notificaciones</span>
+                  <svg class="icon" aria-hidden="true"><use href="#t-chevron"></use></svg>
+                </a>
+                <button type="button" data-pending="Seguridad">
+                  <svg class="icon" aria-hidden="true"><use href="#t-settings"></use></svg>
+                  <span>Seguridad</span>
+                  <svg class="icon" aria-hidden="true"><use href="#t-chevron"></use></svg>
+                </button>
+                <button type="button" data-pending="Centro de ayuda">
+                  <svg class="icon" aria-hidden="true"><use href="#t-help"></use></svg>
+                  <span>Centro de ayuda</span>
+                  <svg class="icon" aria-hidden="true"><use href="#t-chevron"></use></svg>
+                </button>
+              </div>
+            </aside>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Formulario para agregar disponibilidad -->
+  <dialog class="tutor-dialog" id="tutor-block-dialog" aria-labelledby="block-dialog-title">
+    <form id="tutor-block-form">
+      <div class="tutor-section-heading">
+        <h2 id="block-dialog-title">Agregar bloque</h2>
+        <button class="tutor-icon-button" type="button" data-close-dialog aria-label="Cerrar">
+          <svg class="icon" aria-hidden="true"><use href="#t-close"></use></svg>
+        </button>
+      </div>
+
+      <div class="tutor-dialog-fields">
+        <label class="tutor-field">
+          <span>Fecha</span>
+          <input id="tutor-block-date" type="date" required>
+        </label>
+        <label class="tutor-field">
+          <span>Hora de inicio</span>
+          <input id="tutor-block-start" type="time" min="08:00" max="19:30" step="1800" required>
+        </label>
+        <label class="tutor-field">
+          <span>Hora de fin</span>
+          <input id="tutor-block-end" type="time" min="08:30" max="20:00" step="1800" required>
+        </label>
+        <label class="tutor-field">
+          <span>Modalidad</span>
+          <select id="tutor-block-mode">
+            <option>Virtual</option>
+            <option>Presencial</option>
+            <option>Virtual y presencial</option>
+          </select>
+        </label>
+      </div>
+
+      <p class="tutor-form-error" id="tutor-block-error" role="alert"></p>
+      <button class="tutor-button" type="submit">Agregar a la demostración</button>
+    </form>
+  </dialog>
+
+  <!-- Detalle de una solicitud o sesión -->
+  <dialog class="tutor-dialog" id="tutor-detail-dialog" aria-labelledby="tutor-detail-title">
+    <div class="tutor-section-heading">
+      <h2 id="tutor-detail-title">Detalle de tutoría</h2>
+      <button class="tutor-icon-button" type="button" data-close-dialog aria-label="Cerrar">
+        <svg class="icon" aria-hidden="true"><use href="#t-close"></use></svg>
+      </button>
+    </div>
+    <div id="tutor-detail-content"></div>
+  </dialog>
+
+  <p class="tutor-toast" id="tutor-toast" role="status" aria-live="polite" hidden></p>
+</body>
+</html>

@@ -1,0 +1,115 @@
+/* css/tutor-solicitudes.css */
+
+.tutor-request-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.tutor-request-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 18px;
+}
+
+.tutor-request-grid > .tutor-empty {
+  grid-column: 1 / -1;
+}
+
+.tutor-request-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--tutor-border);
+  border-radius: var(--tutor-radius);
+  background: #ffffff;
+}
+
+.tutor-request-header {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--tutor-border);
+}
+
+.tutor-request-person {
+  flex: 1;
+  min-width: 100px;
+}
+
+.tutor-request-person .tutor-label {
+  margin-bottom: 4px;
+  font-size: 10px;
+}
+
+.tutor-request-person h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.tutor-request-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 18px 0;
+  padding: 0;
+  list-style: none;
+  color: var(--tutor-muted);
+  font-size: 12px;
+}
+
+.tutor-request-meta li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+.tutor-request-meta .icon {
+  width: 16px;
+  height: 16px;
+  color: var(--tutor-accent);
+}
+
+.tutor-request-message {
+  margin: 0 0 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--tutor-border);
+  color: var(--tutor-muted);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.7;
+}
+
+.tutor-request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.tutor-request-actions .tutor-button {
+  flex: 1 1 100px;
+  padding: 10px;
+  font-size: 11px;
+}
+
+@media (max-width: 1200px) {
+  .tutor-request-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .tutor-request-filters,
+  .tutor-request-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
