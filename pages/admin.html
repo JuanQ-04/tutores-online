@@ -179,6 +179,16 @@
           <svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg>
           <span>Configuración</span>
         </button>
+
+        <button class="secondary-navigation-link sidebar-logout logout-button" type="button" aria-label="Cerrar sesión">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1-2-2h4"></path>
+            <path d="m16 17 5-5-5-5"></path>
+            <path d="M21 12H9"></path>
+          </svg>
+          <span>Cerrar sesión</span>
+        </button>
+
       </div>
     </aside>
 
@@ -720,5 +730,8 @@
   </dialog>
 
   <p class="admin-toast" id="admin-toast" role="status" aria-live="polite" hidden></p>
+
+  <script type="module" src="../js/auth.js"></script>
+
 </body>
 </html>

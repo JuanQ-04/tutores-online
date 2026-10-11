@@ -26,6 +26,18 @@ const DEMO_MESSAGE =
 statusNote.setAttribute("role", "status");
 statusNote.setAttribute("aria-live", "polite");
 
+// Si el tutor ya envió su solicitud (en revisión) o fue rechazada,
+// mostrar el aviso correspondiente en lugar del formulario.
+const resultadoParam = new URLSearchParams(window.location.search).get("resultado");
+
+if (resultadoParam === "pendiente" || resultadoParam === "rechazado") {
+  form.style.display = "none";
+  const aviso = document.getElementById(
+    resultadoParam === "pendiente" ? "tutor-pendiente" : "tutor-rechazado"
+  );
+  if (aviso) aviso.style.display = "block";
+}
+
 // Actualiza el contador según el límite definido en el HTML.
 function updatePresentationCount() {
   presentationCount.textContent =
@@ -159,10 +171,33 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
+  // El formulario ya validó → completar el perfil del tutor en Firebase.
+  if (typeof completarPerfilTutor === "function") {
+    completarPerfilTutor({
+      titulo: titleInput.value,
+      institucion: institutionInput.value,
+      ciudad: cityInput.value,
+      presentacion: presentationInput.value,
+      materias: subjectInputs
+        .filter((input) => input.checked)
+        .map((input) => input.value),
+      franjas: timeInputs
+        .filter((input) => input.checked)
+        .map((input) => input.value),
+      hojaVidaPDF: fileInput.files[0]?.name || ""
+    });
+    return;
+  }
+
+  // Si llegas aquí, js/auth.js no se cargó: no define completarPerfilTutor.
+  console.error(
+    "completarPerfilTutor no está definida. "
+    + "¿Se cargó js/auth.js? Revisa la consola por errores de red o de módulo."
+  );
   statusNote.textContent =
-    "El formulario cumple las validaciones de formato. "
-    + "El envío de la solicitud estará disponible al conectar Firebase. "
-    + "Por ahora no se ha enviado ninguna solicitud.";
+    "Error interno: la autenticación no se cargó. "
+    + "Abre la consola (F12) y verifica que js/auth.js exista y que "
+    + "registro-tutor.html lo cargue como script type=\"module\".";
 });
 
 // Retira errores y avisos desactualizados al modificar un campo.

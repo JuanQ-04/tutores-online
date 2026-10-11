@@ -96,22 +96,13 @@ function handleContinue(event) {
     return;
   }
 
-  if (getSelectedRole() === "tutor") {
-    statusNote.textContent =
-      "Los campos cumplen las validaciones del formulario. "
-      + "El siguiente paso será completar tu perfil profesional; "
-      + "esa pantalla todavía está en preparación. "
-      + "No se ha enviado ninguna solicitud.";
-
-    window.location.href = "registro-tutor.html";
-
+  // El formulario ya validó → crear la cuenta en Firebase según el rol.
+  if (typeof registrarNuevoUsuario === "function") {
+    registrarNuevoUsuario(getSelectedRole());
     return;
   }
 
-  statusNote.textContent =
-    "Los campos cumplen las validaciones del formulario. "
-    + "La creación de la cuenta estará disponible al conectar Firebase. "
-    + "Por ahora no se ha creado ninguna cuenta.";
+  statusNote.textContent = DEMO_MESSAGE;
 }
 
 // Limpia el error anterior al corregir un campo y restablece el aviso.

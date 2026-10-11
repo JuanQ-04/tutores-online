@@ -613,3 +613,17 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.auth-sesion-activa {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border, #ddd);
+  border-radius: 12px;
+  background: var(--color-surface, #f9fafb);
+  text-align: center;
+}
+
+.auth-sesion-activa p {
+  margin: 0 0 12px;
+  font-size: 14px;
+}

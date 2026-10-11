@@ -126,6 +126,15 @@
           <svg class="icon" width="16" height="16"><use href="#icon-arrow-right"></use></svg>
         </button>
       </form>
+      </div>
+
+      <!-- Aviso de sesión activa (se muestra si ya iniciaste sesión) -->
+      <div id="auth-sesion-activa" class="auth-sesion-activa" style="display: none;" role="status">
+        <p><strong>Ya tienes una sesión activa.</strong></p>
+        <a id="auth-ir-panel" class="button button-primary button-full" href="#">
+          Entrar a mi panel
+        </a>
+      </div>
 
       <div class="auth-divider">
         <span>o continúa con</span>
@@ -156,5 +165,6 @@
       });
     }
   </script>
+  <script type="module" src="../js/auth.js"></script>
 </body>
 </html>

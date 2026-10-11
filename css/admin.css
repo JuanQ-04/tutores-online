@@ -1119,3 +1119,18 @@
   border-top: 1px solid var(--admin-border);
   text-align: center;
 }
+
+/* Cerrar sesión — compartido entre estudiante, tutor y admin */
+.sidebar-logout {
+  width: 100%;
+  margin-top: 4px;
+
+  background: none;
+  border: none;
+
+  color: #c0392b;
+}
+.sidebar-logout:hover {
+  color: #a93226;
+  background-color: #fdf0ef;
+}

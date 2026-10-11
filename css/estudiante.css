@@ -2379,3 +2379,18 @@ a.user-avatar {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Cerrar sesión — compartido entre estudiante, tutor y admin */
+.sidebar-logout {
+  width: 100%;
+  margin-top: 4px;
+
+  background: none;
+  border: none;
+
+  color: #c0392b;
+}
+.sidebar-logout:hover {
+  color: #a93226;
+  background-color: #fdf0ef;
+}
