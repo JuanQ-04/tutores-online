@@ -9,6 +9,10 @@
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/dashboard.css">
   <link rel="stylesheet" href="../css/estudiante-inicio.css">
+  <link rel="stylesheet" href="../css/estudiante-buscar.css">
+  <link rel="stylesheet" href="../css/estudiante-tutorias.css">
+  <link rel="stylesheet" href="../css/estudiante-notificaciones.css">
+  <link rel="stylesheet" href="../css/estudiante-perfil.css">
 </head>
 
 <body>
@@ -76,6 +80,58 @@
     <symbol id="icon-heart" viewBox="0 0 24 24">
       <path d="M20.8 8.8c0 5.4-8.8 11-8.8 11s-8.8-5.6-8.8-11A4.8 4.8 0 0 1 12 6.3a4.8 4.8 0 0 1 8.8 2.5z"></path>
     </symbol>
+
+    <symbol id="icon-book" viewBox="0 0 24 24">
+      <path d="M12 5v16"></path>
+      <path d="M12 5C9 3 6 3 3 4v15c3-1 6-1 9 2"></path>
+      <path d="M12 5c3-2 6-2 9-1v15c-3-1-6-1-9 2"></path>
+    </symbol>
+
+    <symbol id="icon-pin" viewBox="0 0 24 24">
+      <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"></path>
+      <circle cx="12" cy="10" r="3"></circle>
+    </symbol>
+
+    <symbol id="icon-filter" viewBox="0 0 24 24">
+      <path d="M3 5h18l-7 8v6l-4-2v-4z"></path>
+    </symbol>
+
+    <symbol id="icon-grid" viewBox="0 0 24 24">
+      <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+      <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+      <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+      <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+    </symbol>
+
+    <symbol id="icon-cap" viewBox="0 0 24 24">
+      <path d="m2 9 10-5 10 5-10 5z"></path>
+      <path d="M6 11v5c3 2 9 2 12 0v-5"></path>
+    </symbol>
+
+    <symbol id="icon-star" viewBox="0 0 24 24">
+      <path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path>
+    </symbol>
+
+    <symbol id="icon-chevron-down" viewBox="0 0 24 24">
+      <path d="m6 9 6 6 6-6"></path>
+    </symbol>
+
+    <symbol id="icon-shield" viewBox="0 0 24 24">
+      <path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6z"></path>
+      <path d="m9 12 2 2 4-4"></path>
+    </symbol>
+
+    <symbol id="icon-check" viewBox="0 0 24 24">
+      <path d="m5 12 5 5 9-10"></path>
+    </symbol>
+
+    <symbol id="icon-plus" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14"></path>
+    </symbol>
+
+    <symbol id="icon-chevron-right" viewBox="0 0 24 24">
+      <path d="m9 6 6 6-6 6"></path>
+    </symbol>
   </svg>
 
   <div class="student-dashboard">
@@ -136,20 +192,6 @@
           <span>Mis tutorías</span>
         </a>
 
-        <a href="#notificaciones">
-          <svg class="icon" aria-hidden="true">
-            <use href="#icon-bell"></use>
-          </svg>
-          <span>Notificaciones</span>
-          <span class="navigation-badge" aria-label="2 notificaciones sin leer">2</span>
-        </a>
-
-        <a href="#perfil">
-          <svg class="icon" aria-hidden="true">
-            <use href="#icon-user"></use>
-          </svg>
-          <span>Mi perfil</span>
-        </a>
       </nav>
 
       <div class="sidebar-bottom">
@@ -170,10 +212,6 @@
           <span>Configuración</span>
         </a>
 
-        <a class="secondary-navigation-link" href="../index.html">
-          <span aria-hidden="true">↗</span>
-          <span>Salir del prototipo</span>
-        </a>
       </div>
     </aside>
 
@@ -210,21 +248,82 @@
         </div>
 
         <div class="topbar-actions">
+          <!-- Campana de notificaciones (única) -->
+          <div class="notifications-widget" id="notifications-widget">
+            <button
+              class="topbar-notifications"
+              id="notifications-toggle"
+              type="button"
+              aria-label="Notificaciones, 2 sin leer"
+              aria-expanded="false"
+              aria-controls="notifications-dropdown"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="#icon-bell"></use>
+              </svg>
+              <span class="notification-dot" aria-hidden="true">2</span>
+            </button>
 
-          <a
-            class="topbar-notifications"
-            href="#notificaciones"
-            aria-label="Notificaciones, 2 sin leer"
-          >
-            <svg class="icon" aria-hidden="true">
-              <use href="#icon-bell"></use>
-            </svg>
-            <span class="notification-dot" aria-hidden="true">2</span>
-          </a>
+            <div
+              class="notifications-dropdown"
+              id="notifications-dropdown"
+              aria-labelledby="notifications-dropdown-title"
+              hidden
+            >
+              <div class="notifications-heading">
+                <h2 id="notifications-dropdown-title">Notificaciones</h2>
+                <span class="notifications-unread">2 sin leer</span>
+              </div>
 
-          <button class="user-avatar" type="button" aria-label="Perfil de Sofía">
+              <p class="notifications-demo">
+                Información de ejemplo.
+              </p>
+
+              <ul class="notifications-preview">
+                <li class="notification-entry is-unread">
+                  <span class="notification-marker" aria-hidden="true"></span>
+                  <div>
+                    <h3>Tutoría confirmada</h3>
+                    <p>Tu sesión con María Rodríguez está confirmada.</p>
+                    <span class="notification-read-label">Sin leer</span>
+                  </div>
+                </li>
+
+                <li class="notification-entry is-unread">
+                  <span class="notification-marker" aria-hidden="true"></span>
+                  <div>
+                    <h3>Solicitud pendiente</h3>
+                    <p>Tu solicitud con Diego Salazar espera respuesta.</p>
+                    <span class="notification-read-label">Sin leer</span>
+                  </div>
+                </li>
+
+                <li class="notification-entry">
+                  <span class="notification-marker" aria-hidden="true"></span>
+                  <div>
+                    <h3>Tutoría completada</h3>
+                    <p>Tu sesión con Inés Morales figura como completada.</p>
+                    <span class="notification-read-label">Leída</span>
+                  </div>
+                </li>
+              </ul>
+
+              <a
+                class="notifications-view-all"
+                id="notifications-view-all"
+                href="#notificaciones"
+              >
+                <span>Ver todas</span>
+                <svg class="icon" aria-hidden="true">
+                  <use href="#icon-arrow-right"></use>
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          <a class="user-avatar" href="#perfil" aria-label="Mi perfil, Sofía">
             SP
-          </button>
+          </a>
         </div>
       </header>
 
@@ -242,13 +341,6 @@
                 Organiza tus tutorías y sigue avanzando en tus metas.
               </p>
             </div>
-
-            <a class="primary-button" href="#buscar">
-              <svg class="icon" aria-hidden="true">
-                <use href="#icon-search"></use>
-              </svg>
-              <span>Buscar un tutor</span>
-            </a>
           </div>
 
           <div class="dashboard-grid">
@@ -448,8 +540,493 @@
             </div>
           </section>
         </section>
+
+        <section class="student-search" id="buscar" aria-labelledby="search-title" hidden>
+          <p class="eyebrow">Explorar acompañamiento</p>
+          <h1 id="search-title">Encuentra tu próximo tutor</h1>
+          <p class="search-description">
+            Busca por materia, nivel o el tipo de sesión que necesitas.
+          </p>
+
+          <form class="search-filters" role="search" onsubmit="return false">
+            <label class="filter-field filter-text">
+              <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+              <input type="search" placeholder="¿Qué te gustaría aprender?" aria-label="Buscar tutor o materia">
+            </label>
+
+            <label class="filter-field">
+              <svg class="icon" aria-hidden="true"><use href="#icon-book"></use></svg>
+              <select aria-label="Materia">
+                <option>Todas las materias</option>
+                <option>Matemáticas</option>
+                <option>Física</option>
+                <option>Inglés</option>
+              </select>
+              <svg class="icon filter-chevron" aria-hidden="true"><use href="#icon-chevron-down"></use></svg>
+            </label>
+
+            <label class="filter-field">
+              <svg class="icon" aria-hidden="true"><use href="#icon-pin"></use></svg>
+              <select aria-label="Modalidad">
+                <option>Cualquier modalidad</option>
+                <option>Virtual</option>
+                <option>Presencial</option>
+              </select>
+              <svg class="icon filter-chevron" aria-hidden="true"><use href="#icon-chevron-down"></use></svg>
+            </label>
+
+            <button class="primary-button filter-submit" type="submit">
+              <svg class="icon" aria-hidden="true"><use href="#icon-filter"></use></svg>
+              <span>Aplicar filtros</span>
+            </button>
+          </form>
+
+          <div class="results-bar">
+            <p class="results-count"><strong>3 tutores encontrados</strong></p>
+            <label class="sort-field">
+              <span>Ordenar por</span>
+              <select aria-label="Ordenar por">
+                <option>Mejor calificación</option>
+                <option>Disponibilidad</option>
+                <option>Más reseñas</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="tutor-grid">
+            <!-- Tarjeta 1 -->
+            <article class="tutor-card tone-green">
+              <div class="tutor-cover">
+                <img class="tutor-photo" src="../images/tutor-maria.webp" alt="María Rodríguez" width="104" height="104">
+                <button class="favorite-button" type="button" aria-label="Guardar a María Rodríguez">
+                  <svg class="icon" aria-hidden="true"><use href="#icon-heart"></use></svg>
+                </button>
+              </div>
+              <div class="tutor-body">
+                <div class="tutor-title">
+                  <div>
+                    <p class="tutor-subject">Matemáticas</p>
+                    <h3>María Rodríguez</h3>
+                  </div>
+                  <span class="online-dot" title="En línea"></span>
+                </div>
+                <p class="tutor-bio">Te ayudo a entender lo que parecía difícil con ejemplos claros y un ritmo que se adapta a ti.</p>
+                <ul class="tutor-meta">
+                  <li><svg class="icon" aria-hidden="true"><use href="#icon-cap"></use></svg>Secundaria · Bachillerato</li>
+                  <li><svg class="icon" aria-hidden="true"><use href="#icon-pin"></use></svg>Bogotá · Chapinero</li>
+                </ul>
+                <div class="tutor-rating">
+                  <span class="stars">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                  </span>
+                  <strong>4.9</strong><small>(38)</small>
+                  <span class="availability">Disponible hoy</span>
+                </div>
+                <div class="tutor-actions">
+                  <a class="outline-button" href="#perfil">Ver perfil</a>
+                  <a class="solid-button" href="#tutorias">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-calendar"></use></svg>Reservar
+                  </a>
+                </div>
+              </div>
+            </article>
+
+            <!-- Tarjeta 2 -->
+            <article class="tutor-card tone-blue">
+              <div class="tutor-cover">
+                <img class="tutor-photo" src="../images/tutor-diego.webp" alt="Diego Salazar" width="104" height="104">
+                <button class="favorite-button" type="button" aria-label="Guardar a Diego Salazar">
+                  <svg class="icon" aria-hidden="true"><use href="#icon-heart"></use></svg>
+                </button>
+              </div>
+              <div class="tutor-body">
+                <div class="tutor-title">
+                  <div>
+                    <p class="tutor-subject">Física</p>
+                    <h3>Diego Salazar</h3>
+                  </div>
+                  <span class="online-dot" title="En línea"></span>
+                </div>
+                <p class="tutor-bio">Convertimos fórmulas en intuición. Sesiones prácticas para resolver problemas con confianza.</p>
+                <ul class="tutor-meta">
+                  <li><svg class="icon" aria-hidden="true"><use href="#icon-cap"></use></svg>Bachillerato · Universidad</li>
+                  <li><svg class="icon" aria-hidden="true"><use href="#icon-pin"></use></svg>Disponible en línea</li>
+                </ul>
+                <div class="tutor-rating">
+                  <span class="stars">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                  </span>
+                  <strong>4.8</strong><small>(24)</small>
+                  <span class="availability">3 espacios esta semana</span>
+                </div>
+                <div class="tutor-actions">
+                  <a class="outline-button" href="#perfil">Ver perfil</a>
+                  <a class="solid-button" href="#tutorias">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-calendar"></use></svg>Reservar
+                  </a>
+                </div>
+              </div>
+            </article>
+
+            <!-- Tarjeta 3 -->
+            <article class="tutor-card tone-sand">
+              <div class="tutor-cover">
+                <img class="tutor-photo" src="../images/tutor-ines.webp" alt="Inés Morales" width="104" height="104">
+                <button class="favorite-button" type="button" aria-label="Guardar a Inés Morales">
+                  <svg class="icon" aria-hidden="true"><use href="#icon-heart"></use></svg>
+                </button>
+              </div>
+              <div class="tutor-body">
+                <div class="tutor-title">
+                  <div>
+                    <p class="tutor-subject">Inglés</p>
+                    <h3>Inés Morales</h3>
+                  </div>
+                  <span class="online-dot" title="En línea"></span>
+                </div>
+                <p class="tutor-bio">Conversaciones reales, objetivos concretos y un espacio amable para que te animes a hablar.</p>
+                <ul class="tutor-meta">
+                  <li><svg class="icon" aria-hidden="true"><use href="#icon-cap"></use></svg>Todos los niveles</li>
+                  <li><svg class="icon" aria-hidden="true"><use href="#icon-pin"></use></svg>Bogotá · Teusaquillo</li>
+                </ul>
+                <div class="tutor-rating">
+                  <span class="stars">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                    <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+                  </span>
+                  <strong>5.0</strong><small>(51)</small>
+                  <span class="availability">Disponible mañana</span>
+                </div>
+                <div class="tutor-actions">
+                  <a class="outline-button" href="#perfil">Ver perfil</a>
+                  <a class="solid-button" href="#tutorias">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-calendar"></use></svg>Reservar
+                  </a>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- Sección Mis tutorías -->
+        <section class="student-sessions" id="tutorias" aria-labelledby="sessions-title" hidden>
+          <div class="welcome-row">
+            <div>
+              <p class="eyebrow">Tu aprendizaje</p>
+              <h1 id="sessions-title">Mis tutorías</h1>
+              <p class="sessions-description">
+                Todo lo que has reservado, en un solo lugar.
+              </p>
+            </div>
+
+            <a class="primary-button filter-submit" href="#buscar">
+              <svg class="icon" aria-hidden="true">
+                <use href="#icon-search"></use>
+              </svg>
+              <span>Buscar un tutor</span>
+            </a>
+          </div>
+
+          <!-- Pestañas de estado -->
+          <div class="sessions-tabs" role="tablist">
+            <button class="tab-btn is-active" type="button" role="tab" aria-selected="true">
+              <span>Próximas (este mes)</span>
+              <span class="tab-count">2</span>
+            </button>
+            <button class="tab-btn" type="button" role="tab" aria-selected="false">
+              <span>Pendientes</span>
+              <span class="tab-count">1</span>
+            </button>
+            <button class="tab-btn" type="button" role="tab" aria-selected="false">
+              <span>Completadas</span>
+              <span class="tab-count">4</span>
+            </button>
+            <button class="tab-btn" type="button" role="tab" aria-selected="false">
+              <span>Canceladas</span>
+            </button>
+          </div>
+
+          <!-- Lista de tutorías -->
+          <div class="sessions-list">
+            <!-- Tutoría 1 -->
+            <a class="session-item" href="#detalle-tutoria">
+              <div class="session-main-info">
+                <img
+                  src="../images/tutor-maria.webp"
+                  alt="María Rodríguez"
+                  class="session-tutor-avatar"
+                  width="50"
+                  height="50"
+                >
+                <div class="session-details">
+                  <p class="session-subject">Matemáticas</p>
+                  <h3 class="session-title">Sesión con María Rodríguez</h3>
+                  <ul class="session-meta-row">
+                    <li>
+                      <svg class="icon" aria-hidden="true"><use href="#icon-calendar"></use></svg>
+                      <span>Mié, 28 ago</span>
+                    </li>
+                    <li>
+                      <svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>
+                      <span>4:00 PM</span>
+                    </li>
+                    <li>
+                      <svg class="icon" aria-hidden="true"><use href="#icon-video"></use></svg>
+                      <span>Virtual</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="session-status-side">
+                <span class="status-tag confirmed">Confirmada</span>
+                <svg class="icon session-arrow" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
+              </div>
+            </a>
+
+            <!-- Tutoría 2 -->
+            <a class="session-item" href="#detalle-tutoria">
+              <div class="session-main-info">
+                <img
+                  src="../images/tutor-diego.webp"
+                  alt="Diego Salazar"
+                  class="session-tutor-avatar"
+                  width="50"
+                  height="50"
+                >
+                <div class="session-details">
+                  <p class="session-subject">Física</p>
+                  <h3 class="session-title">Sesión con Diego Salazar</h3>
+                  <ul class="session-meta-row">
+                    <li>
+                      <svg class="icon" aria-hidden="true"><use href="#icon-calendar"></use></svg>
+                      <span>Vie, 30 ago</span>
+                    </li>
+                    <li>
+                      <svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>
+                      <span>6:30 PM</span>
+                    </li>
+                    <li>
+                      <svg class="icon" aria-hidden="true"><use href="#icon-video"></use></svg>
+                      <span>Virtual</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="session-status-side">
+                <span class="status-tag pending">Pendiente</span>
+                <svg class="icon session-arrow" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
+              </div>
+            </a>
+
+            <!-- Tutoría 3 -->
+            <a class="session-item" href="#detalle-tutoria">
+              <div class="session-main-info">
+                <img
+                  src="../images/tutor-ines.webp"
+                  alt="Inés Morales"
+                  class="session-tutor-avatar"
+                  width="50"
+                  height="50"
+                >
+                <div class="session-details">
+                  <p class="session-subject">Inglés Conversacional</p>
+                  <h3 class="session-title">Sesión con Inés Morales</h3>
+                  <ul class="session-meta-row">
+                    <li>
+                      <svg class="icon" aria-hidden="true"><use href="#icon-calendar"></use></svg>
+                      <span>Lun, 19 ago</span>
+                    </li>
+                    <li>
+                      <svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg>
+                      <span>3:00 PM</span>
+                    </li>
+                    <li>
+                      <svg class="icon" aria-hidden="true"><use href="#icon-pin"></use></svg>
+                      <span>Presencial</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="session-status-side">
+                <span class="status-tag completed">Completada</span>
+                <svg class="icon session-arrow" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
+              </div>
+            </a>
+          </div>
+        </section>
+
+        <!-- Sección Todas las notificaciones -->
+        <section
+          class="student-notifications"
+          id="notificaciones"
+          aria-labelledby="notifications-title"
+          hidden
+        >
+          <div class="notifications-page-heading">
+            <div>
+              <h1 id="notifications-title" tabindex="-1">
+                Todas las notificaciones
+              </h1>
+              <p>Consulta las novedades de tus solicitudes y tutorías.</p>
+            </div>
+
+            <button
+              class="notifications-back"
+              id="notifications-back"
+              type="button"
+            >
+              Volver
+            </button>
+          </div>
+
+          <p class="demo-notice">
+            Vista de demostración: estas notificaciones son de ejemplo.
+            No se consultan ni se guardan datos en Firebase.
+          </p>
+
+          <ul class="notifications-full-list">
+            <li class="notification-entry is-unread">
+              <span class="notification-marker" aria-hidden="true"></span>
+              <div>
+                <h2>Tutoría confirmada</h2>
+                <p>Tu sesión con María Rodríguez está confirmada.</p>
+                <span class="notification-read-label">Sin leer</span>
+              </div>
+            </li>
+
+            <li class="notification-entry is-unread">
+              <span class="notification-marker" aria-hidden="true"></span>
+              <div>
+                <h2>Solicitud pendiente</h2>
+                <p>Tu solicitud con Diego Salazar espera respuesta.</p>
+                <span class="notification-read-label">Sin leer</span>
+              </div>
+            </li>
+
+            <li class="notification-entry">
+              <span class="notification-marker" aria-hidden="true"></span>
+              <div>
+                <h2>Tutoría completada</h2>
+                <p>Tu sesión con Inés Morales figura como completada.</p>
+                <span class="notification-read-label">Leída</span>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <!-- Sección Mi perfil -->
+        <section class="student-profile" id="perfil" aria-labelledby="profile-title" hidden>
+        <div class="welcome-row">
+            <div>
+            <p class="eyebrow">Tu cuenta</p>
+            <h1 id="profile-title">Mi perfil</h1>
+            <p class="profile-description">
+                Mantén tu información lista para tu próxima sesión.
+            </p>
+            </div>
+
+            <button class="primary-button filter-submit" id="profile-save" type="submit" form="profile-form">
+            <svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg>
+            <span>Guardar cambios</span>
+            </button>
+        </div>
+
+        <p class="demo-notice" id="profile-note" role="status" aria-live="polite">
+            Vista de demostración: los cambios no se guardan.
+        </p>
+
+        <div class="profile-layout">
+            <form class="profile-card" id="profile-form" novalidate>
+            <div class="profile-identity">
+                <div class="profile-photo">
+                <span class="profile-avatar" aria-hidden="true">SP</span>
+                <button class="profile-photo-edit" type="button" aria-label="Cambiar foto de perfil">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
+                </button>
+                </div>
+
+                <div>
+                <h2 class="profile-name">Sofía Pérez</h2>
+                <p class="profile-role">Estudiante · Bachillerato</p>
+                </div>
+            </div>
+
+            <div class="profile-fields">
+                <label class="profile-field">
+                <span>Nombre</span>
+                <input type="text" id="perfil-nombre" value="Sofía" autocomplete="given-name" required>
+                </label>
+
+                <label class="profile-field">
+                <span>Apellido</span>
+                <input type="text" id="perfil-apellido" value="Pérez" autocomplete="family-name" required>
+                </label>
+
+                <label class="profile-field profile-field-full">
+                <span>Correo electrónico</span>
+                <input type="email" id="perfil-correo" value="sofia@correo.com" autocomplete="email" required>
+                </label>
+            </div>
+            </form>
+
+            <aside class="preferences-card" aria-labelledby="preferences-title">
+            <h2 id="preferences-title">Preferencias</h2>
+
+            <ul class="preferences-list">
+                <li>
+                <a href="#notificaciones">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-bell"></use></svg>
+                    <span>
+                    <strong>Notificaciones</strong>
+                    <small>Activas para solicitudes y recordatorios</small>
+                    </span>
+                    <svg class="icon preferences-arrow" aria-hidden="true"><use href="#icon-chevron-right"></use></svg>
+                </a>
+                </li>
+
+                <li>
+                <a href="#seguridad">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg>
+                    <span>
+                    <strong>Seguridad</strong>
+                    <small>Contraseña y acceso</small>
+                    </span>
+                    <svg class="icon preferences-arrow" aria-hidden="true"><use href="#icon-chevron-right"></use></svg>
+                </a>
+                </li>
+
+                <li>
+                <a href="#ayuda">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-help"></use></svg>
+                    <span>
+                    <strong>Centro de ayuda</strong>
+                    <small>Resuelve tus dudas</small>
+                    </span>
+                    <svg class="icon preferences-arrow" aria-hidden="true"><use href="#icon-chevron-right"></use></svg>
+                </a>
+                </li>
+            </ul>
+            </aside>
+        </div>
+        </section>
       </main>
     </div>
   </div>
+
+  <script src="../js/estudiante-notificaciones.js"></script>
+  <script src="../js/estudiante-perfil.js"></script>
+  <script src="../js/estudiante.js"></script>
+
 </body>
 </html>

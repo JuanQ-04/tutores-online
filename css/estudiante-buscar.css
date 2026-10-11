@@ -1,0 +1,565 @@
+/* ==========================================================================
+   css/estudiante-buscar.css — Sección Buscar tutores
+   ========================================================================== */
+
+/* 1. Sección y encabezado */
+.student-search {
+  min-width: 0;
+}
+
+.student-search[hidden] {
+  display: none;
+}
+
+.student-search,
+.student-search * {
+  box-sizing: border-box;
+}
+
+.student-search .eyebrow {
+  margin: 0 0 8px;
+  color: var(--color-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.student-search h1 {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.15;
+  letter-spacing: -0.8px;
+  text-wrap: balance;
+}
+
+.student-search .search-description {
+  margin: 12px 0 0;
+  color: var(--color-text-muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* Iconos limitados a esta sección */
+.student-search .icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+}
+
+/* 2. Formulario de búsqueda */
+.student-search .search-filters {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.4fr)
+    minmax(0, 1fr)
+    minmax(0, 1fr)
+    auto;
+  align-items: stretch;
+  gap: 12px;
+  margin: 28px 0 0;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background-color: #ffffff;
+}
+
+.student-search .filter-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: #ffffff;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color 180ms ease;
+}
+
+.student-search .filter-field > .icon:first-child {
+  color: var(--color-accent);
+}
+
+.student-search .filter-field:focus-within {
+  border-color: var(--color-accent);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.student-search .filter-field input,
+.student-search .filter-field select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.student-search .filter-field input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+.student-search .filter-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.student-search .filter-chevron {
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+
+.student-search .filter-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  margin: 0;
+  padding: 12px 18px;
+  border: 1px solid var(--color-accent);
+  border-radius: 10px;
+  background-color: var(--color-accent);
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.student-search .filter-submit:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+}
+
+/* 3. Cantidad de resultados y orden */
+.student-search .results-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin: 28px 0 20px;
+}
+
+.student-search .results-count {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: 14px;
+}
+
+.student-search .results-count strong {
+  font-weight: 700;
+}
+
+.student-search .sort-field {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.student-search .sort-field select {
+  max-width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* 4. Cuadrícula de tutores */
+.student-search .tutor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 20px;
+}
+
+.student-search .tutor-card {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background-color: #ffffff;
+  transform-origin: center;
+  transition: transform 180ms ease, border-color 180ms ease;
+}
+
+/* Agrandar únicamente en dispositivos con cursor */
+@media (hover: hover) and (pointer: fine) {
+  .student-search .tutor-card:hover {
+    z-index: 1;
+    border-color: var(--color-accent);
+    transform: translateY(-3px) scale(1.02);
+  }
+}
+
+.student-search .tutor-card:focus-within {
+  border-color: var(--color-accent);
+}
+
+/* 5. Cabecera, foto y favorito */
+.student-search .tutor-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 160px;
+  padding: 24px;
+  background-color: #e8f2ee;
+}
+
+.student-search .tone-green .tutor-cover {
+  background-color: #e8f2ee;
+}
+
+.student-search .tone-blue .tutor-cover {
+  background-color: #e9f0f7;
+}
+
+.student-search .tone-sand .tutor-cover {
+  background-color: #f5eee2;
+}
+
+.student-search .tutor-photo {
+  display: block;
+  width: 104px;
+  height: 104px;
+  flex-shrink: 0;
+  border: 4px solid #ffffff;
+  border-radius: 50%;
+  background-color: #ffffff;
+  object-fit: cover;
+}
+
+.student-search .tutor-cover .favorite-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background-color: #ffffff;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: color 180ms ease, border-color 180ms ease;
+}
+
+.student-search .tutor-cover .favorite-button:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* 6. Información del tutor */
+.student-search .tutor-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding: 20px;
+}
+
+.student-search .tutor-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.student-search .tutor-title > div {
+  min-width: 0;
+}
+
+.student-search .tutor-subject {
+  margin: 0 0 6px;
+  color: var(--color-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.student-search .tutor-title h3 {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.student-search .online-dot {
+  display: block;
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background-color: #24734d;
+}
+
+.student-search .tutor-bio {
+  margin: 14px 0 16px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.student-search .tutor-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.student-search .tutor-meta li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+.student-search .tutor-meta .icon {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: var(--color-accent);
+}
+
+/* 7. Calificación y disponibilidad */
+.student-search .tutor-rating {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.student-search .stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #956315;
+}
+
+.student-search .stars .icon {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+  stroke-width: 1;
+}
+
+.student-search .tutor-rating strong {
+  margin-left: 3px;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.student-search .tutor-rating small {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.student-search .availability {
+  margin-left: auto;
+  color: #24734d;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* 8. Botones de las tarjetas */
+.student-search .tutor-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.student-search .tutor-actions .outline-button,
+.student-search .tutor-actions .solid-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 42px;
+  padding: 10px 8px;
+  border: 1px solid var(--color-accent);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  text-decoration: none;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.student-search .tutor-actions .outline-button {
+  background-color: #ffffff;
+  color: var(--color-accent);
+}
+
+.student-search .tutor-actions .outline-button:hover {
+  border-color: var(--color-primary);
+  background-color: #f0f5f5;
+  color: var(--color-primary);
+}
+
+.student-search .tutor-actions .solid-button {
+  background-color: var(--color-accent);
+  color: #ffffff;
+}
+
+.student-search .tutor-actions .solid-button:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+}
+
+.student-search .tutor-actions .icon {
+  width: 15px;
+  height: 15px;
+}
+
+/* 9. Accesibilidad */
+.student-search button:focus-visible,
+.student-search a:focus-visible,
+.student-search .sort-field select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* 10. Pantallas intermedias */
+@media (max-width: 1200px) {
+  .student-search .search-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .student-search .tutor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 11. Celular */
+@media (max-width: 640px) {
+  .student-search .search-filters {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    margin-top: 22px;
+    padding: 14px;
+  }
+
+  .student-search .filter-submit {
+    width: 100%;
+  }
+
+  .student-search .results-bar {
+    align-items: flex-start;
+    flex-direction: column;
+    margin-top: 24px;
+  }
+
+  .student-search .sort-field {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .student-search .sort-field select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .student-search .tutor-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .student-search .tutor-cover {
+    min-height: 150px;
+    padding: 22px;
+  }
+
+  .student-search .tutor-body {
+    padding: 18px;
+  }
+}
+
+/* Pantallas especialmente estrechas */
+@media (max-width: 360px) {
+  .student-search .availability {
+    width: 100%;
+    margin: 4px 0 0;
+  }
+
+  .student-search .tutor-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Respetar la preferencia de movimiento reducido */
+@media (prefers-reduced-motion: reduce) {
+  .student-search *,
+  .student-search *::before,
+  .student-search *::after {
+    transition: none;
+  }
+
+  .student-search .tutor-card:hover {
+    transform: none;
+  }
+}
