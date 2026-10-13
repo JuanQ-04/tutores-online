@@ -108,7 +108,11 @@ const DEMO_TUTORES = [
     buscar: "Buscar tutores",
     tutorias: "Mis tutorías",
     notificaciones: "Notificaciones",
-    perfil: "Mi perfil"
+    perfil: "Mi perfil",
+    "detalle-tutoria": "Detalle de tutoría",
+    seguridad: "Seguridad",
+    ayuda: "Centro de ayuda",
+    reservar: "Reservar tutoría"
   };
   const DEFAULT_SECTION = "inicio";
 
@@ -563,6 +567,63 @@ const DEMO_TUTORES = [
     tab.addEventListener("click", () => selectTab(tab, STATUS_KEYS[index]));
   });
 
+
+  // ---- Detalle y cancelación de una tutoría ----
+  let selectedId = null;
+  const detail = $("#detalle-tutoria");
+  const cancelDialog = $("#cancel-dialog");
+  const sessionById = () => DEMO_SESIONES.find((s) => String(s.id) === String(selectedId));
+
+  sessionsList.addEventListener("click", (event) => {
+    const item = event.target.closest("[data-session-id]");
+    if (item) selectedId = item.dataset.sessionId;
+  });
+
+  function renderDetail() {
+    const s = sessionById();
+    if (!s) { window.location.hash = "tutorias"; return; }
+    const estado = ESTADO_LABEL[s.status];
+    const cancelable = s.status === "upcoming" || s.status === "pending";
+    $("#detail-subject", detail).textContent = s.subject;
+    $("#detail-title", detail).textContent = s.title;
+    $("#detail-tutor", detail).textContent = "Con " + s.tutor;
+    const tag = $("#detail-status", detail);
+    tag.className = "status-tag " + estado.clase;
+    tag.textContent = estado.texto;
+    $("#detail-meta", detail).innerHTML = [s.date, s.time, s.mode].map((t) => `<li><span>${t}</span></li>`).join("");
+    $("#detail-note", detail).textContent = s.status === "upcoming"
+      ? "El enlace de la videoconferencia se habilita 15 minutos antes del inicio."
+      : cancelable ? "Esperando la respuesta del tutor." : "Esta tutoría ya no se puede cancelar.";
+    $("#detail-cancel", detail).hidden = !cancelable;
+  }
+  window.addEventListener("hashchange", () => {
+    if (window.location.hash === "#detalle-tutoria") renderDetail();
+  });
+  if (window.location.hash === "#detalle-tutoria") window.location.hash = "tutorias";
+
+  $("#detail-cancel").addEventListener("click", () => {
+    const s = sessionById();
+    if (!s) return;
+    $("#cancel-text").textContent = `${s.title} con ${s.tutor}, ${s.date} a las ${s.time}.`;
+    cancelDialog.showModal();
+  });
+  $("#cancel-keep").addEventListener("click", () => cancelDialog.close());
+  $("#cancel-confirm").addEventListener("click", () => {
+    const s = sessionById();
+    if (s) s.status = "cancelled";
+    cancelDialog.close();
+    renderCounts();
+    selectTab(tabs[3], STATUS_KEYS[3]);
+    window.location.hash = "tutorias";
+    showDemoToast("Tutoría cancelada (demostración).");
+  });
+
+  window.agregarTutoriaPendiente = (sesion) => {
+    DEMO_SESIONES.unshift(sesion);
+    renderCounts();
+    selectTab(tabs[1], STATUS_KEYS[1]);
+  };
+
   // Estado inicial: primera pestaña (Próximas)
   renderCounts();
   if (tabs[0]) selectTab(tabs[0], STATUS_KEYS[0]);
@@ -753,8 +814,8 @@ const DEMO_TUTORES = [
       event.preventDefault();
       const name = $(".tp-name", dialog).textContent;
       dialog.close();
-      showDemoToast(`Solicitud enviada a ${name} (demostración).`);
-      window.location.hash = "tutorias";
+      const tutor = DEMO_TUTORES.find((t) => t.name === name);
+      if (tutor) window.iniciarReserva(tutor);
     });
 
     document.body.appendChild(dialog);
@@ -791,10 +852,7 @@ const DEMO_TUTORES = [
     if (reserveLink) {
       event.preventDefault();
       const tutor = tutorById(reserveLink.dataset.tutorReserve);
-      if (tutor) {
-        showDemoToast(`Solicitud enviada a ${tutor.name} (demostración).`);
-      }
-      window.location.hash = "tutorias";
+      if (tutor) window.iniciarReserva(tutor);
       return;
     }
 
@@ -804,4 +862,120 @@ const DEMO_TUTORES = [
       favorite.setAttribute("aria-pressed", String(!pressed));
     }
   });
+})();
+
+/* =========================================================
+   7. Seguridad y contacto (demostración)
+   ========================================================= */
+(() => {
+  const security = $("#security-form");
+  const note = $("#security-note");
+  if (security) {
+    security.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const { actual, nueva, confirmar } = security.elements;
+      let msg = "";
+      if (!actual.value) msg = "Escribe tu contraseña actual.";
+      else if (nueva.value.length < 8) msg = "La nueva contraseña debe tener al menos 8 caracteres.";
+      else if (nueva.value !== confirmar.value) msg = "Las contraseñas nuevas no coinciden.";
+      if (msg) { note.textContent = msg; return; }
+      security.reset();
+      note.textContent = "Vista de demostración: la contraseña no se cambia.";
+      showDemoToast("Contraseña actualizada (demostración).");
+    });
+  }
+
+  const contact = $("#contact-form");
+  if (contact) {
+    contact.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const { asunto, mensaje } = contact.elements;
+      if (!asunto.value.trim() || !mensaje.value.trim()) {
+        showDemoToast("Completa el asunto y el mensaje.");
+        return;
+      }
+      contact.reset();
+      showDemoToast("Mensaje enviado al equipo (demostración).");
+    });
+  }
+})();
+
+/* =========================================================
+   8. Reservar tutoría: modalidad → fecha y hora → revisión
+   ========================================================= */
+(() => {
+  const sec = $("#reservar");
+  if (!sec) return;
+  const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const HORAS = ["9:00 AM", "11:00 AM", "2:00 PM", "4:00 PM"];
+  const st = { tutor: null, modo: "", dia: "", hora: "", paso: 1 };
+  const note = $("#reserva-note");
+  const pasos = $$("#reserva-pasos li");
+
+  const dias = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i + 1);
+    return `${DIAS[d.getDay()]}, ${d.getDate()} ${MESES[d.getMonth()]}`;
+  });
+  $("#reserva-dias").innerHTML = dias.map((d) => `<button type="button" class="reserva-opcion" data-dia="${d}" aria-pressed="false">${d}</button>`).join("");
+  $("#reserva-horas").innerHTML = HORAS.map((h) => `<button type="button" class="reserva-opcion" data-hora="${h}" aria-pressed="false">${h}</button>`).join("");
+
+  function marcar(selector, attr, valor) {
+    $$(selector, sec).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset[attr] === valor)));
+  }
+
+  function render() {
+    [1, 2, 3].forEach((n) => { $("#reserva-p" + n).hidden = n !== st.paso; });
+    pasos.forEach((li, i) => li.classList.toggle("is-active", i + 1 <= st.paso));
+    $("#reserva-sig span").textContent = st.paso === 3 ? "Enviar solicitud" : "Continuar";
+    $("#reserva-atras").hidden = st.paso === 1;
+    if (st.paso === 3) {
+      $("#reserva-resumen").innerHTML = [
+        st.tutor.name + " · " + st.tutor.subject, st.dia + " a las " + st.hora, st.modo
+      ].map((t) => `<li><span>${t}</span></li>`).join("");
+    }
+    note.textContent = "";
+  }
+
+  window.iniciarReserva = (tutor) => {
+    Object.assign(st, { tutor, modo: tutor.modality === "Presencial" ? "Presencial" : "", dia: "", hora: "", paso: 1 });
+    $("#reserva-tutor").textContent = `Con ${tutor.name} · ${tutor.subject}`;
+    marcar(".reserva-opcion[data-modo]", "modo", st.modo);
+    marcar(".reserva-opcion[data-dia]", "dia", "");
+    marcar(".reserva-opcion[data-hora]", "hora", "");
+    $("#reserva-card").hidden = false;
+    $("#reserva-ok").hidden = true;
+    render();
+    window.location.hash = "reservar";
+  };
+
+  sec.addEventListener("click", (event) => {
+    const b = event.target.closest(".reserva-opcion");
+    if (!b) return;
+    if (b.dataset.modo) { st.modo = b.dataset.modo; marcar(".reserva-opcion[data-modo]", "modo", st.modo); }
+    if (b.dataset.dia) { st.dia = b.dataset.dia; marcar(".reserva-opcion[data-dia]", "dia", st.dia); }
+    if (b.dataset.hora) { st.hora = b.dataset.hora; marcar(".reserva-opcion[data-hora]", "hora", st.hora); }
+    note.textContent = "";
+  });
+
+  $("#reserva-atras").addEventListener("click", () => { st.paso -= 1; render(); });
+  $("#reserva-sig").addEventListener("click", () => {
+    if (st.paso === 1 && !st.modo) { note.textContent = "Elige una modalidad para continuar."; return; }
+    if (st.paso === 2 && (!st.dia || !st.hora)) { note.textContent = "Elige un día y una hora para continuar."; return; }
+    if (st.paso < 3) { st.paso += 1; render(); return; }
+    const t = st.tutor;
+    window.agregarTutoriaPendiente({
+      id: Date.now(), tutor: t.name, subject: t.subject, title: "Tutoría de " + t.subject,
+      avatar: t.photo, date: st.dia, time: st.hora, mode: st.modo,
+      modeIcon: st.modo === "Virtual" ? "video" : "pin", status: "pending"
+    });
+    $("#reserva-card").hidden = true;
+    $("#reserva-ok").hidden = false;
+  });
+
+  // Si entran a #reservar sin haber elegido tutor, volver a la búsqueda
+  const guard = () => { if (window.location.hash === "#reservar" && !st.tutor) window.location.hash = "buscar"; };
+  window.addEventListener("hashchange", guard);
+  window.addEventListener("DOMContentLoaded", guard);
 })();
