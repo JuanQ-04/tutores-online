@@ -1,0 +1,473 @@
+/* ==========================================================================
+   css/buscar.css — Pantalla pública «Tutores disponibles»
+   Reutiliza el encabezado y el pie de landing.css.
+   ========================================================================== */
+
+.pub-main {
+  width: 100%;
+  max-width: 1210px;
+  margin-inline: auto;
+  padding: 24px 28px 64px;
+}
+
+/* 1. Introducción */
+.pub-intro {
+  margin-bottom: 28px;
+}
+
+.pub-back {
+  display: inline-block;
+  margin-bottom: 18px;
+  color: var(--color-accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pub-back:hover {
+  color: var(--color-primary);
+}
+
+.pub-intro h1 {
+  margin: 6px 0 8px;
+  color: var(--color-primary);
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.15;
+}
+
+.pub-intro p {
+  color: var(--color-text-muted);
+  max-width: 60ch;
+}
+
+/* 2. Filtros */
+.pub-filters {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr auto;
+  align-items: end;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background-color: var(--color-bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.pub-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pub-label {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.pub-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: var(--color-bg-body);
+  color: var(--color-text-muted);
+  transition: border-color var(--transition-fast);
+}
+
+.pub-input-wrap:focus-within {
+  border-color: var(--color-border-focus);
+}
+
+.pub-input-wrap input,
+.pub-input-wrap select {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text-main);
+  font-size: 14px;
+}
+
+.pub-clear {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: var(--color-bg-surface);
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.pub-clear:hover {
+  border-color: var(--color-accent);
+  background-color: var(--color-primary-light);
+}
+
+/* 3. Barra de resultados */
+.pub-results-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 26px 0 16px;
+}
+
+.pub-count {
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.pub-count strong {
+  color: var(--color-primary);
+}
+
+.pub-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.pub-sort select {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-bg-surface);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 4. Tarjetas */
+/* Base de los íconos generados por js/buscar.js (no llevan atributos
+   de trazo/relleno). Va antes de las reglas específicas para que estas
+   la sobrescriban (.pub-meta .icon, .pub-stars .icon, .pub-btn .icon). */
+.pub-card .icon,
+.pub-dialog .icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+}
+
+.pub-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 20px;
+}
+
+.pub-empty {
+  grid-column: 1 / -1;
+  padding: 48px 20px;
+  border: 1px dashed var(--color-border);
+  border-radius: 16px;
+  background-color: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.pub-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background-color: #ffffff;
+  transition: transform 180ms ease, border-color 180ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pub-card:hover {
+    border-color: var(--color-accent);
+    transform: translateY(-3px);
+  }
+}
+
+.pub-card:focus-within {
+  border-color: var(--color-accent);
+}
+
+.pub-cover,
+.pub-dialog-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 160px;
+  padding: 24px;
+  background-color: #e8f2ee;
+}
+
+.tone-green .pub-cover,
+.pub-dialog.tone-green .pub-dialog-cover { background-color: #e8f2ee; }
+.tone-blue .pub-cover,
+.pub-dialog.tone-blue .pub-dialog-cover { background-color: #e9f0f7; }
+.tone-sand .pub-cover,
+.pub-dialog.tone-sand .pub-dialog-cover { background-color: #f5eee2; }
+
+.pub-photo {
+  display: block;
+  width: 104px;
+  height: 104px;
+  border: 4px solid #ffffff;
+  border-radius: 50%;
+  background-color: #ffffff;
+  object-fit: cover;
+}
+
+.pub-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding: 20px;
+}
+
+.pub-subject {
+  margin: 0 0 6px;
+  color: var(--color-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.pub-body h2,
+.pub-dialog-body h2 {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.pub-bio {
+  margin: 14px 0 16px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.pub-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.pub-meta li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+.pub-meta .icon {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: var(--color-accent);
+}
+
+.pub-rating {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.pub-stars {
+  display: inline-flex;
+  gap: 2px;
+  color: #956315;
+}
+
+.pub-stars .icon {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+  stroke-width: 1;
+}
+
+.pub-rating strong {
+  margin-left: 3px;
+  color: var(--color-primary);
+  font-size: 12px;
+}
+
+.pub-rating small {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.pub-availability {
+  margin-left: auto;
+  color: #24734d;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* 5. Botones */
+.pub-actions,
+.pub-dialog-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.pub-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 10px 8px;
+  border: 1px solid var(--color-accent);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.pub-btn .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.pub-btn-outline {
+  background-color: #ffffff;
+  color: var(--color-accent);
+}
+
+.pub-btn-outline:hover {
+  border-color: var(--color-primary);
+  background-color: #f0f5f5;
+  color: var(--color-primary);
+}
+
+.pub-btn-solid {
+  background-color: var(--color-accent);
+  color: #ffffff;
+}
+
+.pub-btn-solid:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+}
+
+/* 6. Aviso de inicio de sesión */
+.pub-login-note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 28px;
+  padding: 16px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: 14px;
+}
+
+.pub-login-note a {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* 7. Diálogo de perfil */
+.pub-dialog {
+  width: min(460px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  padding: 0;
+  overflow: auto;
+  border: 0;
+  border-radius: 16px;
+  background-color: #ffffff;
+  color: var(--color-text-main);
+  box-shadow: var(--shadow-lg);
+}
+
+.pub-dialog::backdrop {
+  background-color: rgba(15, 23, 42, 0.5);
+}
+
+.pub-dialog-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background-color: #ffffff;
+  color: var(--color-primary);
+}
+
+.pub-dialog-body {
+  padding: 22px;
+}
+
+.pub-rating-line {
+  margin-top: 6px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* 8. Responsive */
+@media (max-width: 1020px) {
+  .pub-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pub-field-wide {
+    grid-column: 1 / -1;
+  }
+
+  .pub-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .pub-main {
+    padding-inline: 18px;
+  }
+
+  .pub-filters,
+  .pub-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

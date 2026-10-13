@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Tutores disponibles | TutoresOn-Line</title>
+
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/landing.css">
+  <link rel="stylesheet" href="../css/buscar.css">
+</head>
+
+<body>
+
+  <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="icon-search" viewBox="0 0 24 24">
+        <circle cx="10.5" cy="10.5" r="7.5"></circle>
+        <path d="m16 16 5 5"></path>
+      </symbol>
+      <symbol id="icon-book" viewBox="0 0 24 24">
+        <path d="M12 5v16"></path>
+        <path d="M12 5C9 3 6 3 3 4v15c3-1 6-1 9 2"></path>
+        <path d="M12 5c3-2 6-2 9-1v15c-3-1-6-1-9 2"></path>
+      </symbol>
+      <symbol id="icon-calendar" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+        <path d="M7 3v4M17 3v4M3 10h18"></path>
+        <path d="M7 14h2M12 14h2M17 14h1M7 18h2M12 18h2"></path>
+      </symbol>
+      <symbol id="icon-video" viewBox="0 0 24 24">
+        <rect x="3" y="6" width="12" height="12" rx="2"></rect>
+        <path d="m15 10 6-4v12l-6-4z"></path>
+      </symbol>
+      <symbol id="icon-pin" viewBox="0 0 24 24">
+        <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"></path>
+        <circle cx="12" cy="10" r="3"></circle>
+      </symbol>
+      <symbol id="icon-cap" viewBox="0 0 24 24">
+        <path d="m2 9 10-5 10 5-10 5z"></path>
+        <path d="M6 11v5c3 2 9 2 12 0v-5"></path>
+      </symbol>
+      <symbol id="icon-star" viewBox="0 0 24 24">
+        <path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path>
+      </symbol>
+      <symbol id="icon-lock" viewBox="0 0 24 24">
+        <rect x="4" y="11" width="16" height="10" rx="2"></rect>
+        <path d="M8 11V7a4 4 0 0 1 8 0v4"></path>
+      </symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24">
+        <path d="M6 6l12 12M18 6 6 18"></path>
+      </symbol>
+    </defs>
+  </svg>
+
+  <div class="landing-page">
+
+    <!-- Barra superior (misma que la landing) -->
+    <header class="landing-nav">
+
+      <a href="../index.html" class="brand brand-lockup">
+        <img src="../images/logo.webp" alt="" class="brand-mark" width="28" height="28">
+        <span>Tutores<span>On-Line</span></span>
+      </a>
+
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="menu-principal"
+        aria-label="Abrir menú"
+      >
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+      </button>
+
+      <div class="landing-menu" id="menu-principal">
+        <nav class="landing-links" aria-label="Navegación principal">
+          <a href="../index.html#como-funciona">Cómo funciona</a>
+          <a href="../index.html#modalidades">Modalidades</a>
+          <a href="registro.html">Para tutores</a>
+        </nav>
+
+        <div class="landing-actions">
+          <a href="login.html" class="text-button">Iniciar sesión</a>
+          <a href="registro.html" class="button button-primary">Crear cuenta</a>
+        </div>
+      </div>
+
+    </header>
+
+    <main class="pub-main">
+
+      <section class="pub-intro" aria-labelledby="pub-title">
+        <a class="pub-back" href="../index.html">← Volver al inicio</a>
+        <span class="eyebrow">Explora acompañamiento</span>
+        <h1 id="pub-title">Encuentra tu próximo tutor</h1>
+        <p>Busca por materia, fecha o modalidad. Para reservar una sesión necesitas iniciar sesión.</p>
+      </section>
+
+      <!-- Filtros -->
+      <form class="pub-filters" id="pub-filters" role="search" aria-label="Filtrar tutores">
+
+        <label class="pub-field pub-field-wide">
+          <span class="pub-label">Buscar</span>
+          <span class="pub-input-wrap">
+            <svg class="icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#icon-search"></use></svg>
+            <input type="search" id="f-texto" placeholder="Nombre o tema">
+          </span>
+        </label>
+
+        <label class="pub-field">
+          <span class="pub-label">Materia</span>
+          <span class="pub-input-wrap">
+            <svg class="icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#icon-book"></use></svg>
+            <select id="f-materia">
+              <option value="">Todas las materias</option>
+              <option value="matematicas">Matemáticas</option>
+              <option value="fisica">Física</option>
+              <option value="ingles">Inglés</option>
+            </select>
+          </span>
+        </label>
+
+        <label class="pub-field">
+          <span class="pub-label">Fecha</span>
+          <span class="pub-input-wrap">
+            <svg class="icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#icon-calendar"></use></svg>
+            <input type="date" id="f-fecha">
+          </span>
+        </label>
+
+        <label class="pub-field">
+          <span class="pub-label">Modalidad</span>
+          <span class="pub-input-wrap">
+            <svg class="icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#icon-video"></use></svg>
+            <select id="f-modalidad">
+              <option value="">Cualquier modalidad</option>
+              <option value="virtual">Virtual</option>
+              <option value="presencial">Presencial</option>
+            </select>
+          </span>
+        </label>
+
+        <button type="button" class="pub-clear" id="f-limpiar">Limpiar filtros</button>
+      </form>
+
+      <!-- Resultados -->
+      <div class="pub-results-bar">
+        <p class="pub-count" id="pub-count" role="status" aria-live="polite"></p>
+
+        <label class="pub-sort">
+          <span>Ordenar por</span>
+          <select id="f-orden">
+            <option value="rating">Mejor calificación</option>
+            <option value="disponibilidad">Disponibilidad</option>
+            <option value="reseñas">Más reseñas</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="pub-grid" id="pub-grid"></div>
+
+      <aside class="pub-login-note">
+        <svg class="icon" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#icon-lock"></use></svg>
+        <p>
+          ¿Ya elegiste? Al pulsar <strong>Reservar</strong> te pediremos
+          <a href="login.html">iniciar sesión</a> o
+          <a href="registro.html">crear tu cuenta</a> para continuar.
+        </p>
+      </aside>
+
+    </main>
+
+    <footer class="landing-footer">
+      <a href="../index.html" class="brand brand-lockup">
+        <img src="../images/logo.webp" alt="" class="brand-mark" width="28" height="28" loading="lazy">
+        <span>Tutores<span>On-Line</span></span>
+      </a>
+      <p>Aprender mejor también es encontrar el acompañamiento correcto.</p>
+      <p>© 2026 TutoresOn-Line</p>
+    </footer>
+
+  </div>
+
+  <!-- Perfil del tutor -->
+  <dialog class="pub-dialog" id="pub-dialog" aria-labelledby="pd-name">
+    <div class="pub-dialog-cover" id="pd-cover">
+      <button class="pub-dialog-close" type="button" data-cerrar aria-label="Cerrar perfil">
+        <svg class="icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#icon-close"></use></svg>
+      </button>
+      <img class="pub-photo" id="pd-photo" alt="" width="104" height="104">
+    </div>
+    <div class="pub-dialog-body">
+      <p class="pub-subject" id="pd-subject"></p>
+      <h2 id="pd-name"></h2>
+      <p class="pub-rating-line" id="pd-rating"></p>
+      <p class="pub-bio" id="pd-bio"></p>
+      <ul class="pub-meta" id="pd-meta"></ul>
+      <div class="pub-dialog-actions">
+        <button class="pub-btn pub-btn-outline" type="button" data-cerrar>Cerrar</button>
+        <button class="pub-btn pub-btn-solid" type="button" id="pd-reservar">Reservar sesión</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="../js/landing.js"></script>
+  <script src="../js/buscar.js"></script>
+
+</body>
+</html>

@@ -804,4 +804,18 @@ const DEMO_TUTORES = [
       favorite.setAttribute("aria-pressed", String(!pressed));
     }
   });
+
+  // Reserva iniciada en la pantalla pública (pages/buscar.html): tras iniciar
+  // sesión, abrir directamente el perfil del tutor que se quería reservar.
+  try {
+    const pendiente = sessionStorage.getItem("tutorReservaPendiente");
+    if (pendiente) {
+      sessionStorage.removeItem("tutorReservaPendiente");
+      const tutor = tutorById(pendiente);
+      if (tutor) {
+        window.location.hash = "buscar";
+        openTutorProfile(tutor);
+      }
+    }
+  } catch (_) { /* sessionStorage no disponible */ }
 })();

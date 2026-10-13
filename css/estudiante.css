@@ -2147,6 +2147,23 @@ a.user-avatar {
   background-color: rgba(15, 31, 43, 0.45);
 }
 
+/* Íconos del diálogo: se añade al <body>, fuera de .student-search,
+   así que necesita su propia regla base (tamaño, trazo y sin relleno).
+   Va antes de las reglas específicas (.tp-meta .icon, .tp-close .icon…)
+   para que estas la sobrescriban. */
+.tutor-profile-dialog .icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+}
+
 .tp-cover {
   position: relative;
   display: flex;
@@ -2333,6 +2350,11 @@ a.user-avatar {
   border: 1px solid var(--color-accent);
   background-color: var(--color-accent);
   color: #ffff;
+}
+
+.tp-actions .tp-reserve .icon {
+  width: 16px;
+  height: 16px;
 }
 
 .tp-actions .tp-reserve:hover {
