@@ -4,6 +4,7 @@ const statusNote = document.getElementById("tutor-demo-note");
 const titleInput = document.getElementById("titulo");
 const institutionInput = document.getElementById("institucion");
 const cityInput = document.getElementById("ciudad");
+const tarifaInput = document.getElementById("tarifa");
 const presentationInput = document.getElementById("presentacion");
 const presentationCount = document.getElementById("presentacion-count");
 const fileInput = document.getElementById("hoja-vida");
@@ -184,6 +185,7 @@ form.addEventListener("submit", (event) => {
       franjas: timeInputs
         .filter((input) => input.checked)
         .map((input) => input.value),
+      tarifa: Number(tarifaInput.value) || 0,
       hojaVidaPDF: fileInput.files[0]?.name || ""
     });
     return;
