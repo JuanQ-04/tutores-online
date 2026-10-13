@@ -187,21 +187,19 @@
           </svg>
           <span>Mis tutorías</span>
         </a>
+        
+        <a href="#ayuda">
+          <svg class="icon" aria-hidden="true">
+            <use href="#icon-help"></use>
+          </svg>
+          <span>Centro de ayuda</span>
+        </a>
 
       </nav>
 
       <div class="sidebar-bottom">
-        <a class="help-card" href="#ayuda">
-          <svg class="icon" aria-hidden="true">
-            <use href="#icon-help"></use>
-          </svg>
-          <span>
-            <strong>¿Necesitas ayuda?</strong>
-            <small>Estamos para acompañarte</small>
-          </span>
-        </a>
 
-        <a class="secondary-navigation-link" href="#configuracion">
+        <a class="secondary-navigation-link" href="#perfil">
           <svg class="icon" aria-hidden="true">
             <use href="#icon-settings"></use>
           </svg>
@@ -1010,25 +1008,130 @@
                     <svg class="icon preferences-arrow" aria-hidden="true"><use href="#icon-chevron-right"></use></svg>
                 </a>
                 </li>
-
-                <li>
-                <a href="#ayuda">
-                    <svg class="icon" aria-hidden="true"><use href="#icon-help"></use></svg>
-                    <span>
-                    <strong>Centro de ayuda</strong>
-                    <small>Resuelve tus dudas</small>
-                    </span>
-                    <svg class="icon preferences-arrow" aria-hidden="true"><use href="#icon-chevron-right"></use></svg>
-                </a>
-                </li>
             </ul>
             </aside>
         </div>
+        </section>
+
+        <!-- Detalle de tutoría + cancelar -->
+        <section class="student-profile" id="detalle-tutoria" aria-labelledby="detail-title" hidden>
+          <a class="text-link" href="#tutorias">&larr; Volver a mis tutorías</a>
+          <div class="welcome-row">
+            <div>
+              <p class="eyebrow" id="detail-subject"></p>
+              <h1 id="detail-title"></h1>
+              <p class="profile-description" id="detail-tutor"></p>
+            </div>
+            <span class="status-tag" id="detail-status"></span>
+          </div>
+          <div class="profile-card">
+            <ul class="session-meta-row" id="detail-meta"></ul>
+            <p class="demo-notice" id="detail-note" role="status"></p>
+            <button class="outline-button danger-button" id="detail-cancel" type="button">Cancelar tutoría</button>
+          </div>
+        </section>
+
+        <!-- Seguridad -->
+        <section class="student-profile" id="seguridad" aria-labelledby="security-title" hidden>
+          <a class="text-link" href="#perfil">&larr; Volver a mi perfil</a>
+          <div class="welcome-row">
+            <div>
+              <p class="eyebrow">Preferencias de acceso</p>
+              <h1 id="security-title">Seguridad</h1>
+              <p class="profile-description">Protege tu cuenta con una contraseña segura.</p>
+            </div>
+          </div>
+          <p class="demo-notice" id="security-note" role="status" aria-live="polite">Vista de demostración: la contraseña no se cambia.</p>
+          <form class="profile-card" id="security-form" novalidate>
+            <div class="profile-fields">
+              <label class="profile-field profile-field-full"><span>Contraseña actual</span><input type="password" name="actual" autocomplete="current-password"></label>
+              <label class="profile-field"><span>Nueva contraseña</span><input type="password" name="nueva" minlength="8" placeholder="Mínimo 8 caracteres" autocomplete="new-password"></label>
+              <label class="profile-field"><span>Confirmar contraseña</span><input type="password" name="confirmar" autocomplete="new-password"></label>
+            </div>
+            <button class="primary-button filter-submit" type="submit"><span>Actualizar contraseña</span></button>
+          </form>
+        </section>
+
+        <!-- Centro de ayuda + contacto -->
+        <section class="student-profile" id="ayuda" aria-labelledby="help-title" hidden>
+          <div class="welcome-row">
+            <div>
+              <p class="eyebrow">Estamos para acompañarte</p>
+              <h1 id="help-title">Centro de ayuda</h1>
+              <p class="profile-description">Resuelve tus dudas o escríbenos.</p>
+            </div>
+          </div>
+          <div class="profile-card help-faq">
+            <details><summary>¿Cómo reservo una tutoría?</summary><p>Entra a Buscar tutores, abre el perfil del tutor que te guste y pulsa Reservar.</p></details>
+            <details><summary>¿Cómo cancelo una tutoría?</summary><p>Ve a Mis tutorías, abre la tutoría y pulsa Cancelar tutoría. Solo se pueden cancelar las próximas y las pendientes.</p></details>
+            <details><summary>¿Dónde veo el enlace de la videoconferencia?</summary><p>En el detalle de la tutoría. El enlace se habilita 15 minutos antes del inicio.</p></details>
+            <details><summary>¿Cómo cambio mi foto o mis datos?</summary><p>Entra a Mi perfil desde el menú y pulsa Guardar cambios al terminar.</p></details>
+          </div>
+          <form class="profile-card" id="contact-form" novalidate>
+            <h2 class="profile-name">Contactar al equipo</h2>
+            <div class="profile-fields">
+              <label class="profile-field profile-field-full"><span>Asunto</span><input type="text" name="asunto"></label>
+              <label class="profile-field profile-field-full"><span>Mensaje</span><input type="text" name="mensaje" placeholder="Cuéntanos qué pasó"></label>
+            </div>
+            <button class="primary-button filter-submit" type="submit"><span>Enviar mensaje</span></button>
+          </form>
+        </section>
+
+        <!-- Reservar tutoría: modalidad, fecha, revisión y confirmación -->
+        <section class="student-profile" id="reservar" aria-labelledby="reserva-title" hidden>
+          <a class="text-link" href="#buscar">&larr; Volver a buscar tutores</a>
+          <div class="welcome-row">
+            <div>
+              <p class="eyebrow">Reservar tutoría</p>
+              <h1 id="reserva-title">Un espacio para avanzar</h1>
+              <p class="profile-description" id="reserva-tutor"></p>
+            </div>
+          </div>
+          <ol class="reserva-pasos" id="reserva-pasos">
+            <li>Modalidad</li><li>Fecha y hora</li><li>Revisión</li>
+          </ol>
+          <p class="demo-notice" id="reserva-note" role="status" aria-live="polite"></p>
+          <div class="profile-card" id="reserva-card">
+            <div id="reserva-p1">
+              <h2 class="profile-name">¿Cómo quieres tomar tu tutoría?</h2>
+              <div class="reserva-opciones">
+                <button type="button" class="reserva-opcion" data-modo="Virtual" aria-pressed="false"><strong>Virtual</strong><small>Con videollamada</small></button>
+                <button type="button" class="reserva-opcion" data-modo="Presencial" aria-pressed="false"><strong>Presencial</strong><small>En la zona del tutor</small></button>
+              </div>
+            </div>
+            <div id="reserva-p2" hidden>
+              <h2 class="profile-name">Encuentra un momento para ti</h2>
+              <div class="reserva-opciones" id="reserva-dias"></div>
+              <div class="reserva-opciones" id="reserva-horas"></div>
+            </div>
+            <div id="reserva-p3" hidden>
+              <h2 class="profile-name">Revisa antes de enviar</h2>
+              <ul class="session-meta-row" id="reserva-resumen"></ul>
+              <p class="profile-description">Tu solicitud llegará al tutor y te avisaremos cuando la responda.</p>
+            </div>
+            <div class="reserva-acciones">
+              <button type="button" class="outline-button" id="reserva-atras">Atrás</button>
+              <button type="button" class="primary-button filter-submit" id="reserva-sig"><span>Continuar</span></button>
+            </div>
+          </div>
+          <div class="profile-card" id="reserva-ok" hidden>
+            <h2 class="profile-name">Tu siguiente paso ya está en marcha</h2>
+            <p class="profile-description">Enviamos tu solicitud. La verás como pendiente en Mis tutorías.</p>
+            <a class="primary-button filter-submit" href="#tutorias"><span>Ver mis tutorías</span></a>
+          </div>
         </section>
       </main>
     </div>
   </div>
 
+  <dialog class="confirm-dialog" id="cancel-dialog" aria-labelledby="cancel-title">
+    <h2 id="cancel-title">¿Cancelar esta tutoría?</h2>
+    <p id="cancel-text"></p>
+    <div class="confirm-actions">
+      <button class="outline-button" type="button" id="cancel-keep">Mantener tutoría</button>
+      <button class="primary-button danger-solid" type="button" id="cancel-confirm">Sí, cancelar</button>
+    </div>
+  </dialog>
   <script src="../js/estudiante.js"></script>
   <script type="module" src="../js/auth.js"></script>
 
