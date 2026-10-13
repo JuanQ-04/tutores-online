@@ -2435,3 +2435,34 @@ a.user-avatar {
 .reserva-opcion { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 12px 16px; border: 2px solid rgba(0, 0, 0, 0.12); border-radius: 12px; background: #fff; cursor: pointer; font: inherit; }
 .reserva-opcion[aria-pressed="true"] { border-color: #0b78b8; background: #eaf5fb; }
 .reserva-acciones { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
+
+/* Estados vacío / cargando dentro de las tarjetas de Inicio */
+.upcoming-card .sessions-empty,
+.pending-card .sessions-empty {
+  margin-top: 16px;
+}
+
+.upcoming-card .sessions-empty {
+  border-color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.upcoming-card .sessions-empty + .card-action {
+  margin-top: 16px;
+}
+
+/* Botón «Reintentar» de los estados de error */
+.sessions-empty [data-reintentar] {
+  padding: 8px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-surface, #ffffff);
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sessions-empty [data-reintentar]:hover {
+  border-color: var(--color-primary);
+}

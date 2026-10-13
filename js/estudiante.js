@@ -1,7 +1,7 @@
 // js/estudiante.js — Panel del estudiante
 // Requiere: <script type="module" src="../js/estudiante.js"></script>
-// Perfil, Mis tutorías, Buscar tutores y Reservar: conectados a Firestore.
-// Notificaciones, Seguridad y Centro de ayuda: siguen como demostración.
+// Perfil, Inicio, Mis tutorías, Notificaciones, Buscar tutores y Reservar:
+// conectados a Firestore. Seguridad y Centro de ayuda: siguen como demostración.
 
 import { auth, db } from "./firebase-config.js";
 import {
@@ -43,7 +43,7 @@ function showDemoToast(message) {
 
 function escapeHTML(str) {
   return String(str).replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<​": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
   );
 }
 
@@ -85,11 +85,74 @@ function normalize(str) {
   return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
+function horaISO(date) {
+  return [
+    String(date.getHours()).padStart(2, "0"),
+    String(date.getMinutes()).padStart(2, "0")
+  ].join(":");
+}
+
+/* Las materias se guardan en Firestore como "slug" (registro-tutor.html usa
+   value="matematicas", "fisica"…). Aquí se traducen a su nombre para mostrarlas
+   y para que el filtro de Buscar coincida con lo que eligió el tutor. */
+const MATERIAS = {
+  matematicas: "Matemáticas",
+  fisica: "Física",
+  quimica: "Química",
+  programacion: "Programación",
+  idiomas: "Idiomas",
+  estadistica: "Estadística"
+};
+
+function materiaLabel(valor) {
+  const texto = String(valor || "").trim();
+  return MATERIAS[normalize(texto)] || (texto.charAt(0).toUpperCase() + texto.slice(1));
+}
+
+function materiasDe(tutor) {
+  return (Array.isArray(tutor?.materias) ? tutor.materias : []).map(materiaLabel);
+}
+
+function nombreDe(persona) {
+  return `${persona?.nombre || ""} ${persona?.apellido || ""}`.trim();
+}
+
+function iniciales(nombre, porDefecto = "?") {
+  return String(nombre).split(/\s+/).filter(Boolean).slice(0, 2)
+    .map((p) => p[0].toUpperCase()).join("") || porDefecto;
+}
+
+/* Una consulta a Firestore que no responde nunca dejaría la pantalla en
+   "Cargando…" para siempre: tras 15 s se trata como error. */
+function conTimeout(promesa, ms = 15000) {
+  let temporizador;
+  const limite = new Promise((_, rechazar) => {
+    temporizador = setTimeout(() => {
+      rechazar(Object.assign(new Error("Tiempo de espera agotado"), { code: "timeout" }));
+    }, ms);
+  });
+  return Promise.race([promesa, limite]).finally(() => clearTimeout(temporizador));
+}
+
+function detalleError(err) {
+  const code = err?.code || "";
+  if (code === "permission-denied") {
+    return "Firestore no permite esta lectura (permission-denied): hay que revisar las reglas de seguridad.";
+  }
+  if (code === "unavailable" || code === "timeout") return "Revisa tu conexión a internet.";
+  return code ? `(${code})` : "";
+}
+
+function botonReintentar(que) {
+  return `<br><button class="outline-button" type="button" data-reintentar="${que}" style="margin-top:12px">Reintentar</button>`;
+}
+
 /* ================================================================
    Estado global del módulo
    ================================================================ */
 let estudianteUid   = null;
 let profile         = { name: "", lastname: "", email: "" };
+let enviandoSolicitud = false; // evita enviar la misma solicitud dos veces
 let solicitudesData = [];   // docs de "solicitudes" del estudiante
 let tutoriasData    = [];   // docs de "tutorias" del estudiante
 let tutoresData     = [];   // docs de "usuarios" (tutores aprobados)
@@ -97,6 +160,14 @@ let selectedSession = null; // { id, tipo: "solicitud"|"tutoria" }
 let reservaTutor    = null; // tutor elegido para reservar
 let reservaBloque   = null; // bloque de disponibilidad seleccionado
 let reservaModalidad = "";
+
+// Estado de cada carga de datos: "cargando" | "listo" | "error".
+// Así la pantalla distingue "todavía cargando" de "no hay nada" y de "falló".
+let tutoresEstado   = "cargando";
+let tutoresError    = null;
+let tutoriasEstado  = "cargando";
+let tutoriasError   = null;
+let filtroMateria   = "";   // materia elegida en Buscar (se usa al reservar)
 
 // Callbacks que los bloques internos registran y los demás pueden llamar
 let doRenderReserva    = null;
@@ -395,14 +466,18 @@ function normalizarTutoria(raw) {
 
 async function cargarTutorias(uid) {
   try {
-    const [solSnap, tutSnap] = await Promise.all([
+    const [solSnap, tutSnap] = await conTimeout(Promise.all([
       getDocs(query(collection(db, "solicitudes"), where("estudianteId", "==", uid))),
       getDocs(query(collection(db, "tutorias"),    where("estudianteId", "==", uid)))
-    ]);
+    ]));
     solicitudesData = solSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     tutoriasData    = tutSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    tutoriasEstado  = "listo";
+    tutoriasError   = null;
   } catch (err) {
-    console.warn("Error cargando tutorías:", err);
+    console.error("Error cargando tutorías:", err);
+    tutoriasEstado = "error";
+    tutoriasError  = err;
   }
 }
 
@@ -469,8 +544,9 @@ function sessionHtml(item) {
     function renderCounts() {
       tabs.forEach((tab, i) => {
         const key = STATUS_KEYS[i];
-        const n   = getItemsByTab(key).length;
         let badge = $(".tab-count", tab);
+        if (tutoriasEstado !== "listo") { badge?.remove(); return; }
+        const n   = getItemsByTab(key).length;
         if (!badge) {
           badge = document.createElement("span");
           badge.className = "tab-count";
@@ -482,6 +558,14 @@ function sessionHtml(item) {
 
     function renderSessions(key) {
       currentTab = key;
+      if (tutoriasEstado === "cargando") {
+        sessionsList.innerHTML = '<p class="sessions-empty" role="status">Cargando tus tutorías…</p>';
+        return;
+      }
+      if (tutoriasEstado === "error") {
+        sessionsList.innerHTML = `<p class="sessions-empty" role="alert">No pudimos cargar tus tutorías. ${escapeHTML(detalleError(tutoriasError))}${botonReintentar("tutorias")}</p>`;
+        return;
+      }
       const items = getItemsByTab(key).sort((a, b) =>
         `${a.date}T${a.start}`.localeCompare(`${b.date}T${b.start}`)
       );
@@ -621,7 +705,7 @@ function renderDetail() {
             const idx = tutoriasData.findIndex((t) => t.id === selectedSession.id);
             if (idx >= 0) tutoriasData[idx].estado = "cancelada";
           }
-          doRefreshSessions?.();
+          refrescarVistas();
           window.location.hash = "tutorias";
           showDemoToast("Tutoría cancelada.");
         } catch (err) {
@@ -643,34 +727,50 @@ function renderDetail() {
    7. Buscar tutores (Firestore)
    ================================================================ */
 async function cargarTutores() {
+  tutoresEstado = "cargando";
+  tutoresError  = null;
   try {
-    const today = dateISO(new Date());
+    const ahora = new Date();
+    const hoy   = dateISO(ahora);
+    const hora  = horaISO(ahora);
     const q = query(
       collection(db, "usuarios"),
       where("rol",    "==", "tutor"),
-      where("estado", "==", "aprobado")
+      where("estado", "in", ["aprobado", "aceptado"])
     );
-    const snap = await getDocs(q);
+    const snap = await conTimeout(getDocs(q));
     tutoresData = snap.docs.map((d) => {
       const data = d.data();
-      // Filtrar solo bloques futuros
-      const disponibilidad = (data.disponibilidad || []).filter((b) => b.fecha >= today);
+      // Solo bloques que todavía no pasaron, del más próximo al más lejano
+      const disponibilidad = (Array.isArray(data.disponibilidad) ? data.disponibilidad : [])
+        .filter((b) => b && b.fecha &&
+          (b.fecha > hoy || (b.fecha === hoy && (b.horaFin || "23:59") > hora)))
+        .sort((a, b) => `${a.fecha}T${a.horaInicio}`.localeCompare(`${b.fecha}T${b.horaInicio}`));
       return { id: d.id, ...data, disponibilidad };
     });
+    tutoresEstado = "listo";
+    if (!tutoresData.length) {
+      console.info(
+        "[Buscar tutores] La consulta funcionó pero no devolvió tutores. En Firestore → usuarios, " +
+        "un tutor solo aparece si tiene rol = \"tutor\" y estado = \"aprobado\" o \"aceptado\" (exactamente así, en minúsculas)."
+      );
+    }
   } catch (err) {
-    console.warn("Error cargando tutores:", err);
-    tutoresData = [];
+    console.error("Error cargando tutores:", err);
+    tutoresData   = [];
+    tutoresEstado = "error";
+    tutoresError  = err;
   }
 }
 
 const TONES = ["tone-green", "tone-blue", "tone-sand"];
 
 function tutorCardHtml(tutor, index) {
-  const nombre     = `${tutor.nombre || ""} ${tutor.apellido || ""}`.trim() || "Tutor";
-  const inits      = nombre.split(" ").slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("");
-  const materias   = Array.isArray(tutor.materias) ? tutor.materias : [];
-  const materiaLbl = materias.join(", ") || "General";
+  const nombre     = nombreDe(tutor) || "Tutor";
+  const inits      = iniciales(nombre, "T");
+  const materiaLbl = materiasDe(tutor).join(", ") || "General";
   const dispCount  = tutor.disponibilidad?.length || 0;
+  const proximo    = dispCount ? tutor.disponibilidad[0] : null;
   const availText  = dispCount === 0
     ? "Sin horarios disponibles"
     : dispCount === 1 ? "1 horario disponible"
@@ -701,6 +801,7 @@ function tutorCardHtml(tutor, index) {
         <ul class="tutor-meta">
           <li>${svgIcon("cap")}${escapeHTML(tutor.titulo || "Profesional")}</li>
           <li>${svgIcon("pin")}${escapeHTML(tutor.ciudad || "Colombia")}</li>
+          ${proximo ? `<li>${svgIcon("clock")}Próximo: ${escapeHTML(formatDate(proximo.fecha))} · ${escapeHTML(timeLabel(proximo.horaInicio))}</li>` : ""}
         </ul>
         <div class="tutor-rating">
           <span class="availability">${escapeHTML(availText)}</span>
@@ -710,9 +811,9 @@ function tutorCardHtml(tutor, index) {
             : ""}
         </div>
         <div class="tutor-actions">
-          <button class="outline-button" type="button" data-tutor-profile="${tutor.id}">Ver perfil</button>
+          <button class="outline-button" type="button" data-tutor-profile="${escapeHTML(tutor.id)}">Ver perfil</button>
           <button class="solid-button ${dispCount === 0 ? "disabled" : ""}" type="button"
-            data-tutor-reserve="${tutor.id}"
+            data-tutor-reserve="${escapeHTML(tutor.id)}"
             ${dispCount === 0 ? "disabled title='Sin horarios disponibles'" : ""}>
             ${svgIcon("calendar")}Reservar
           </button>
@@ -724,20 +825,39 @@ function tutorCardHtml(tutor, index) {
 {
   const searchSection = $(".student-search");
   if (searchSection) {
-    const searchInput   = $('input[type="search"]', searchSection);
-    const filterSelects = $$(".search-filters .filter-field select", searchSection);
-    const subjectSelect = filterSelects[0];
+    const searchInput    = $('input[type="search"]', searchSection);
+    const filterSelects  = $$(".search-filters .filter-field select", searchSection);
+    const subjectSelect  = filterSelects[0];
     const modalitySelect = filterSelects[1];
-    const sortSelect    = $(".sort-field select", searchSection);
-    const tutorGrid     = $(".tutor-grid", searchSection);
-    const resultsCount  = $(".results-count strong", searchSection);
+    const sortSelect     = $(".sort-field select", searchSection);
+    const tutorGrid      = $(".tutor-grid", searchSection);
+    const resultsCount   = $(".results-count strong", searchSection);
+
+    const setCount = (texto) => { if (resultsCount) resultsCount.textContent = texto; };
+    const mensaje  = (html, rol = "status") =>
+      `<p class="sessions-empty" role="${rol}" style="grid-column:1/-1">${html}</p>`;
 
     function renderTutores() {
       if (!tutorGrid) return;
 
+      if (tutoresEstado === "cargando") {
+        tutorGrid.innerHTML = mensaje("Cargando tutores disponibles…");
+        setCount("Buscando tutores…");
+        return;
+      }
+
+      if (tutoresEstado === "error") {
+        tutorGrid.innerHTML = mensaje(
+          `No pudimos cargar los tutores. ${escapeHTML(detalleError(tutoresError))}${botonReintentar("tutores")}`,
+          "alert"
+        );
+        setCount("No se pudo cargar la lista");
+        return;
+      }
+
       if (tutoresData.length === 0) {
-        tutorGrid.innerHTML = '<p class="sessions-empty">Cargando tutores disponibles…</p>';
-        if (resultsCount) resultsCount.textContent = "";
+        tutorGrid.innerHTML = mensaje("Todavía no hay tutores disponibles. Vuelve pronto: estamos aprobando nuevos perfiles.");
+        setCount("0 tutores encontrados");
         return;
       }
 
@@ -745,17 +865,19 @@ function tutorCardHtml(tutor, index) {
       const subject = subjectSelect?.value  || "Todas las materias";
       const mod     = modalitySelect?.value || "Cualquier modalidad";
       const order   = sortSelect?.value     || "Nombre";
+      filtroMateria = subject === "Todas las materias" ? "" : subject;
 
       const filtered = tutoresData.filter((tutor) => {
-        const nombre   = normalize(`${tutor.nombre || ""} ${tutor.apellido || ""}`);
-        const materias = (tutor.materias || []).map(normalize).join(" ");
+        const materias = materiasDe(tutor);
+        const nombre   = normalize(nombreDe(tutor));
         const bio      = normalize(tutor.presentacion || "");
+        const extra    = normalize(`${tutor.titulo || ""} ${tutor.ciudad || ""}`);
 
         const matchText = !text ||
-          nombre.includes(text) || materias.includes(text) || bio.includes(text);
+          nombre.includes(text) || bio.includes(text) || extra.includes(text) ||
+          materias.some((m) => normalize(m).includes(text));
 
-        const matchSubject = subject === "Todas las materias" ||
-          (tutor.materias || []).includes(subject);
+        const matchSubject = subject === "Todas las materias" || materias.includes(subject);
 
         const matchMod = mod === "Cualquier modalidad" ||
           (tutor.disponibilidad || []).some(
@@ -768,20 +890,14 @@ function tutorCardHtml(tutor, index) {
       if (order === "Disponibilidad") {
         filtered.sort((a, b) => (b.disponibilidad?.length || 0) - (a.disponibilidad?.length || 0));
       } else {
-        filtered.sort((a, b) =>
-          `${a.nombre} ${a.apellido}`.localeCompare(`${b.nombre} ${b.apellido}`, "es")
-        );
+        filtered.sort((a, b) => nombreDe(a).localeCompare(nombreDe(b), "es"));
       }
 
-      if (resultsCount) {
-        resultsCount.textContent = filtered.length === 1
-          ? "1 tutor encontrado"
-          : `${filtered.length} tutores encontrados`;
-      }
+      setCount(filtered.length === 1 ? "1 tutor encontrado" : `${filtered.length} tutores encontrados`);
 
       tutorGrid.innerHTML = filtered.length
         ? filtered.map((t, i) => tutorCardHtml(t, i)).join("")
-        : '<p class="sessions-empty">No encontramos tutores con esos filtros.</p>';
+        : mensaje("No encontramos tutores con esos filtros. Prueba con otra materia o modalidad.");
     }
 
     if (searchInput)    searchInput.addEventListener("input",   renderTutores);
@@ -843,9 +959,9 @@ function openTutorProfile(tutorId) {
   if (!tutor) return;
 
   const dialog  = buildTutorDialog();
-  const nombre  = `${tutor.nombre || ""} ${tutor.apellido || ""}`.trim();
-  const inits   = nombre.split(" ").slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("");
-  const materias = Array.isArray(tutor.materias) ? tutor.materias.join(", ") : "General";
+  const nombre  = nombreDe(tutor);
+  const inits   = iniciales(nombre, "T");
+  const materias = materiasDe(tutor).join(", ") || "General";
   const disps   = Array.isArray(tutor.disponibilidad) ? tutor.disponibilidad : [];
 
   $("#tp-initials", dialog).textContent   = inits;
@@ -884,6 +1000,25 @@ function openTutorProfile(tutorId) {
    9. Delegación de clics (tutores — buscar y perfil-dialog)
    ================================================================ */
 document.addEventListener("click", (event) => {
+  const retryBtn = event.target.closest("[data-reintentar]");
+  if (retryBtn) { reintentar(retryBtn.dataset.reintentar); return; }
+
+  // Enlaces de Inicio que llevan al detalle de una tutoría concreta
+  const sessionLink = event.target.closest("[data-abrir-sesion]");
+  if (sessionLink) {
+    selectedSession = { id: sessionLink.dataset.abrirSesion, tipo: sessionLink.dataset.sesionTipo };
+    renderDetail();
+    return; // el enlace (#detalle-tutoria) hace la navegación
+  }
+
+  // Enlaces de Inicio que abren una pestaña concreta de Mis tutorías
+  const tabLink = event.target.closest("[data-abrir-tab]");
+  if (tabLink) {
+    const tab = $$(".sessions-tabs .tab-btn")[Number(tabLink.dataset.abrirTab)];
+    tab?.click();
+    return;
+  }
+
   const profileBtn = event.target.closest("[data-tutor-profile]");
   if (profileBtn) { openTutorProfile(profileBtn.dataset.tutorProfile); return; }
 
@@ -901,6 +1036,15 @@ document.addEventListener("click", (event) => {
 /* ================================================================
    10. Reservar tutoría (Firestore — crea solicitud)
    ================================================================ */
+// Si el estudiante filtró por una materia que el tutor enseña, se reserva esa;
+// si no, la primera materia del tutor.
+function materiaParaReserva(tutor) {
+  const materias = materiasDe(tutor);
+  return (filtroMateria && materias.includes(filtroMateria))
+    ? filtroMateria
+    : (materias[0] || "General");
+}
+
 function iniciarReserva(tutor) {
   reservaTutor    = tutor;
   reservaBloque   = null;
@@ -909,11 +1053,14 @@ function iniciarReserva(tutor) {
   const sec = $("#reservar");
   if (!sec) return;
 
-  const nombre  = `${tutor.nombre || ""} ${tutor.apellido || ""}`.trim();
-  const materias = Array.isArray(tutor.materias) ? tutor.materias.join(", ") : "General";
+  const nombre  = nombreDe(tutor);
+  const materias = materiasDe(tutor).join(", ") || "General";
   $("#reserva-tutor").textContent = `Con ${nombre} · ${materias}`;
   $("#reserva-card").hidden = false;
   $("#reserva-ok").hidden   = true;
+  const msg = $("#reserva-mensaje");
+  if (msg) msg.value = "";
+  $$(".reserva-opcion[data-modo]", sec).forEach((b) => b.setAttribute("aria-pressed", "false"));
 
   if (doRenderReserva) doRenderReserva(1);
   window.location.hash = "reservar";
@@ -964,8 +1111,8 @@ function iniciarReserva(tutor) {
     function renderResumen() {
       const resumenEl = $("#reserva-resumen", sec);
       if (!resumenEl || !reservaTutor || !reservaBloque) return;
-      const nombre  = `${reservaTutor.nombre || ""} ${reservaTutor.apellido || ""}`.trim();
-      const materia = (reservaTutor.materias || [])[0] || "General";
+      const nombre  = nombreDe(reservaTutor);
+      const materia = materiaParaReserva(reservaTutor);
       resumenEl.innerHTML = [
         `${nombre} · ${materia}`,
         `${formatDate(reservaBloque.fecha)} · ${timeLabel(reservaBloque.horaInicio)} – ${timeLabel(reservaBloque.horaFin)}`,
@@ -1062,13 +1209,38 @@ function iniciarReserva(tutor) {
         }
 
         const mensaje = ($("#reserva-mensaje", sec)?.value || "").trim();
-        const nombre  = `${reservaTutor.nombre || ""} ${reservaTutor.apellido || ""}`.trim();
-        const materia = (reservaTutor.materias || [])[0] || "General";
+        const nombre  = nombreDe(reservaTutor);
+        const materia = materiaParaReserva(reservaTutor);
         const estudNombre = `${profile.name} ${profile.lastname}`.trim() || "Estudiante";
+
+        // Protección contra doble envío (doble clic / reintentos)
+        if (enviandoSolicitud) return;
+        enviandoSolicitud = true;
 
         try {
           nextBtn.disabled = true;
           if (note) note.textContent = "Enviando solicitud…";
+
+          // ¿Ya existe una solicitud pendiente para este mismo tutor y horario?
+          const previas = await getDocs(query(
+            collection(db, "solicitudes"),
+            where("estudianteId", "==", estudianteUid)
+          ));
+          const yaExiste = previas.docs.some((d) => {
+            const x = d.data();
+            return x.estado === "pendiente" &&
+              x.tutorId === reservaTutor.id &&
+              x.fecha === reservaBloque.fecha &&
+              x.horaInicio === reservaBloque.horaInicio;
+          });
+          if (yaExiste) {
+            await cargarTutorias(estudianteUid);
+            refrescarVistas();
+            if (note) note.textContent = "Ya enviaste una solicitud pendiente para ese horario.";
+            nextBtn.disabled = false;
+            enviandoSolicitud = false;
+            return;
+          }
 
           await addDoc(collection(db, "solicitudes"), {
             tutorId:          reservaTutor.id,
@@ -1088,7 +1260,7 @@ function iniciarReserva(tutor) {
 
           // Recargar las solicitudes del estudiante y refrescar las pestañas
           await cargarTutorias(estudianteUid);
-          doRefreshSessions?.();
+          refrescarVistas();
 
           $("#reserva-card").hidden = true;
           $("#reserva-ok").hidden   = false;
@@ -1098,6 +1270,8 @@ function iniciarReserva(tutor) {
           console.error("Error al enviar solicitud:", err);
           nextBtn.disabled = false;
           if (note) note.textContent = "No se pudo enviar la solicitud. Revisa tu conexión.";
+        } finally {
+          enviandoSolicitud = false;
         }
       });
     }
@@ -1153,73 +1327,363 @@ function iniciarReserva(tutor) {
 }
 
 /* ================================================================
-   13. Inicio: actualizar tarjetas con datos reales
+   13. Inicio y notificaciones (datos reales de Firestore)
    ================================================================ */
+function finDeSesion(item) {
+  const [y, m, d] = item.date.split("-").map(Number);
+  const [h, min]  = (item.end || "23:59").split(":").map(Number);
+  return new Date(y, m - 1, d, h, min);
+}
+
+function lunesDeEstaSemana() {
+  const hoy   = new Date();
+  const lunes = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  lunes.setDate(lunes.getDate() - ((lunes.getDay() + 6) % 7));
+  return lunes;
+}
+
+function mensajeVacio(html, rol = "status") {
+  return `<p class="sessions-empty" role="${rol}" style="grid-column:1/-1">${html}</p>`;
+}
+
 function renderInicio() {
-  // Próxima tutoría programada
+  // El aviso "Vista de demostración" ya no aplica en Inicio
+  $("#inicio > .demo-notice")?.remove();
+
+  const ahora = new Date();
+
   const programadas = tutoriasData
     .filter((t) => t.estado === "programada")
     .map(normalizarTutoria)
+    .filter((t) => finDeSesion(t) >= ahora)
     .sort((a, b) => `${a.date}T${a.start}`.localeCompare(`${b.date}T${b.start}`));
 
-  // Solicitudes pendientes
   const pendientes = solicitudesData
     .filter((s) => s.estado === "pendiente")
-    .map(normalizarSolicitud);
+    .map(normalizarSolicitud)
+    .sort((a, b) => `${a.date}T${a.start}`.localeCompare(`${b.date}T${b.start}`));
 
-  // ── Tarjeta "Próxima tutoría" ──
+  /* ── Próxima tutoría ── */
   const upcomingCard = $(".upcoming-card");
   if (upcomingCard) {
-    if (programadas.length > 0) {
+    const cabecera = (insignia = "") => `
+      <div class="card-heading">
+        <div>
+          <p class="card-eyebrow">Tu agenda</p>
+          <h2 id="upcoming-title">Próxima tutoría</h2>
+        </div>${insignia}
+      </div>`;
+
+    if (tutoriasEstado === "cargando") {
+      upcomingCard.innerHTML = cabecera() + mensajeVacio("Cargando tu agenda…");
+    } else if (tutoriasEstado === "error") {
+      upcomingCard.innerHTML = cabecera() +
+        mensajeVacio(`No pudimos cargar tu agenda.${botonReintentar("tutorias")}`, "alert");
+    } else if (!programadas.length) {
+      upcomingCard.innerHTML = cabecera() +
+        mensajeVacio("Aún no tienes tutorías programadas.") +
+        `<a class="card-action" href="#buscar"><span>Buscar un tutor</span>${svgIcon("arrow-right")}</a>`;
+    } else {
       const next    = programadas[0];
-      const dateObj = new Date(next.date + "T12:00:00");
-      const mes     = dateObj.toLocaleDateString("es-CO", { month: "short" }).toUpperCase();
-      const dia     = dateObj.getDate();
-      const dow     = dateObj.toLocaleDateString("es-CO", { weekday: "short" }).toUpperCase().slice(0, 3);
+      const fecha   = new Date(`${next.date}T12:00:00`);
+      const mes     = fecha.toLocaleDateString("es-CO", { month: "short" }).replace(".", "").toUpperCase();
+      const dow     = fecha.toLocaleDateString("es-CO", { weekday: "short" }).replace(".", "").toUpperCase().slice(0, 3);
+      const largo   = fecha.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+      const virtual = next.mode !== "Presencial";
 
-      const lessonDate = $(".lesson-date",    upcomingCard);
-      const subject    = $(".lesson-subject", upcomingCard);
-      const title      = $("h3",              upcomingCard);
-      const tutorEl    = $(".lesson-tutor",   upcomingCard);
-      const timeLi     = $(".lesson-details li:first-child span", upcomingCard);
-
-      if (lessonDate) lessonDate.innerHTML = `<span>${mes}</span><strong>${dia}</strong><span>${dow}</span>`;
-      if (subject)    subject.textContent  = next.subject;
-      if (title)      title.textContent    = `Sesión con ${next.tutor}`;
-      if (tutorEl)    tutorEl.textContent  = `Con ${next.tutor}`;
-      if (timeLi)     timeLi.textContent   = `${timeLabel(next.start)} – ${timeLabel(next.end)}`;
+      upcomingCard.innerHTML = cabecera('<span class="status-badge status-confirmed">Confirmada</span>') + `
+        <div class="lesson-content">
+          <div class="lesson-date" aria-label="${escapeHTML(largo)}">
+            <span>${escapeHTML(mes)}</span><strong>${fecha.getDate()}</strong><span>${escapeHTML(dow)}</span>
+          </div>
+          <div class="lesson-information">
+            <p class="lesson-subject">${escapeHTML(next.subject)}</p>
+            <h3>Sesión con ${escapeHTML(next.tutor)}</h3>
+            <ul class="lesson-details">
+              <li>${svgIcon("clock")}<span>${escapeHTML(timeLabel(next.start))} – ${escapeHTML(timeLabel(next.end))}</span></li>
+              <li>${svgIcon(virtual ? "video" : "pin")}<span>${virtual ? "Sesión virtual" : "Sesión presencial"}</span></li>
+            </ul>
+          </div>
+          <div class="tutor-avatar" aria-label="Iniciales de ${escapeHTML(next.tutor)}">${escapeHTML(iniciales(next.tutor, "T"))}</div>
+        </div>
+        <p class="lesson-reminder">El enlace de la sesión estará disponible 15 minutos antes.</p>
+        <a class="card-action" href="#detalle-tutoria" data-abrir-sesion="${escapeHTML(next.id)}" data-sesion-tipo="tutoria">
+          <span>Ver detalle</span>${svgIcon("arrow-right")}
+        </a>`;
     }
   }
 
-  // ── Tarjeta "Solicitud pendiente" ──
-  const pendingCard = $(".pending-card");
-  if (pendingCard && pendientes.length > 0) {
-    const pend      = pendientes[0];
-    const subjectEl = $(".pending-subject", pendingCard);
-    const updateEl  = $(".pending-update",  pendingCard);
-    if (subjectEl) subjectEl.textContent = pend.subject;
-    if (updateEl)  updateEl.textContent  =
-      `Con ${pend.tutor}. Esperando respuesta del tutor.`;
+  /* ── Tu semana ── */
+  {
+    const lunes   = lunesDeEstaSemana();
+    const domingo = new Date(lunes);
+    domingo.setDate(domingo.getDate() + 6);
+    const desde = dateISO(lunes);
+    const hasta = dateISO(domingo);
+
+    const deLaSemana = tutoriasData
+      .filter((t) => t.estado === "programada" || t.estado === "completada")
+      .map(normalizarTutoria)
+      .filter((t) => t.date >= desde && t.date <= hasta);
+    const hechas = deLaSemana.filter((t) => t.status === "completed").length;
+    const pct    = deLaSemana.length ? Math.round((hechas / deLaSemana.length) * 100) : 0;
+
+    const count = $(".week-count");
+    if (count) {
+      count.textContent = tutoriasEstado === "listo" ? String(deLaSemana.length) : "–";
+      if (count.nextElementSibling) {
+        count.nextElementSibling.textContent = deLaSemana.length === 1 ? "tutoría" : "tutorías";
+      }
+    }
+    const ring = $(".progress-ring");
+    if (ring) {
+      ring.style.background = `conic-gradient(var(--color-accent) 0% ${pct}%, #e7eff0 ${pct}% 100%)`;
+      ring.setAttribute("aria-label", `${pct} por ciento de las tutorías de la semana completadas`);
+      const etiqueta = $("span", ring);
+      if (etiqueta) etiqueta.textContent = `${pct}%`;
+    }
+    const barra = $(".progress-value");
+    if (barra) barra.style.width = `${pct}%`;
+    const pie = $(".week-caption");
+    if (pie) {
+      pie.textContent = tutoriasEstado !== "listo" ? "Cargando tu semana…"
+        : deLaSemana.length ? "de tus tutorías de esta semana completadas"
+        : "Aún no tienes tutorías esta semana";
+    }
   }
+
+  /* ── Solicitud pendiente ── */
+  const pendingCard = $(".pending-card");
+  if (pendingCard) {
+    const cabecera = (insignia = "") => `
+      <div class="card-heading">
+        <div>
+          <p class="card-eyebrow">Seguimiento</p>
+          <h2 id="pending-title">Solicitud pendiente</h2>
+        </div>${insignia}
+      </div>`;
+
+    if (tutoriasEstado === "cargando") {
+      pendingCard.innerHTML = cabecera() + mensajeVacio("Cargando tus solicitudes…");
+    } else if (tutoriasEstado === "error") {
+      pendingCard.innerHTML = cabecera() +
+        mensajeVacio(`No pudimos cargar tus solicitudes.${botonReintentar("tutorias")}`, "alert");
+    } else if (!pendientes.length) {
+      pendingCard.innerHTML = cabecera() + mensajeVacio("No tienes solicitudes pendientes.");
+    } else {
+      const pend  = pendientes[0];
+      const extra = pendientes.length > 1 ? ` Tienes ${pendientes.length - 1} más.` : "";
+      pendingCard.innerHTML = cabecera('<span class="status-badge status-pending">En revisión</span>') + `
+        <div class="pending-content">
+          <span class="pending-subject">${escapeHTML(pend.subject)}</span>
+          <p>${escapeHTML(formatDate(pend.date))} · ${escapeHTML(timeLabel(pend.start))} – ${escapeHTML(timeLabel(pend.end))}</p>
+          <span class="pending-update">Con ${escapeHTML(pend.tutor)}. Esperando respuesta del tutor.${escapeHTML(extra)}</span>
+        </div>
+        <a class="text-link" href="#tutorias" data-abrir-tab="1">
+          Ver mis solicitudes
+          ${svgIcon("arrow-right")}
+        </a>`;
+    }
+  }
+
+  /* ── Recomendaciones: tutores reales con más horarios disponibles ── */
+  const recList = $(".recommendation-list");
+  if (recList) {
+    if (tutoresEstado === "cargando") {
+      recList.innerHTML = mensajeVacio("Cargando tutores…");
+    } else if (tutoresEstado === "error") {
+      recList.innerHTML = mensajeVacio(`No pudimos cargar los tutores.${botonReintentar("tutores")}`, "alert");
+    } else {
+      const top = tutoresData
+        .filter((t) => t.disponibilidad.length > 0)
+        .sort((a, b) => b.disponibilidad.length - a.disponibilidad.length)
+        .slice(0, 3);
+
+      recList.innerHTML = top.length
+        ? top.map((t) => {
+            const nombre = nombreDe(t) || "Tutor";
+            const n      = t.disponibilidad.length;
+            return `
+              <article class="recommendation-card">
+                <div class="recommendation-avatar" aria-hidden="true">${escapeHTML(iniciales(nombre, "T"))}</div>
+                <div class="recommendation-information">
+                  <p class="recommendation-subject">${escapeHTML(materiasDe(t)[0] || "General")}</p>
+                  <h3>${escapeHTML(nombre)}</h3>
+                  <p>${n === 1 ? "1 horario disponible" : `${n} horarios disponibles`}</p>
+                </div>
+                <button class="favorite-button" type="button"
+                  data-tutor-profile="${escapeHTML(t.id)}"
+                  aria-label="Ver perfil de ${escapeHTML(nombre)}">
+                  ${svgIcon("arrow-right")}
+                </button>
+              </article>`;
+          }).join("")
+        : mensajeVacio("Cuando un tutor publique horarios, lo verás aquí.");
+    }
+  }
+}
+
+/* ── Notificaciones: se generan a partir de tus solicitudes y tutorías ── */
+const CLAVE_NOTIF_VISTAS = "estudianteNotificacionesVistas:";
+
+function leerNotificacionesVistas() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(CLAVE_NOTIF_VISTAS + estudianteUid) || "[]"));
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function guardarNotificacionesVistas(vistas) {
+  try {
+    localStorage.setItem(CLAVE_NOTIF_VISTAS + estudianteUid, JSON.stringify([...vistas]));
+  } catch (_) { /* almacenamiento no disponible: no es crítico */ }
+}
+
+function construirNotificaciones() {
+  const lista = [];
+  const marca = (raw) =>
+    (raw.creadaEn?.toMillis?.() ?? Date.parse(`${tsToISO(raw.fecha)}T00:00:00`)) || 0;
+
+  solicitudesData.forEach((raw) => {
+    const s      = normalizarSolicitud(raw);
+    const cuando = `${formatDate(s.date)}, ${timeLabel(s.start)}`;
+    if (raw.estado === "pendiente") {
+      lista.push({
+        key: `sol:${raw.id}:pendiente`, ts: marca(raw), titulo: "Solicitud pendiente",
+        texto: `Tu solicitud con ${s.tutor} (${cuando}) espera respuesta.`
+      });
+    } else if (raw.estado === "rechazada") {
+      lista.push({
+        key: `sol:${raw.id}:rechazada`, ts: marca(raw), titulo: "Solicitud cerrada",
+        texto: `Tu solicitud con ${s.tutor} (${cuando}) fue rechazada o cancelada.`
+      });
+    }
+  });
+
+  tutoriasData.forEach((raw) => {
+    const t      = normalizarTutoria(raw);
+    const cuando = `${formatDate(t.date)}, ${timeLabel(t.start)}`;
+    const textos = {
+      programada: ["Tutoría confirmada", `Tu sesión con ${t.tutor} está confirmada para ${cuando}.`],
+      completada: ["Tutoría completada", `Tu sesión con ${t.tutor} figura como completada.`],
+      cancelada:  ["Tutoría cancelada",  `Tu sesión con ${t.tutor} (${cuando}) fue cancelada.`]
+    }[raw.estado];
+    if (textos) {
+      lista.push({ key: `tut:${raw.id}:${raw.estado}`, ts: marca(raw), titulo: textos[0], texto: textos[1] });
+    }
+  });
+
+  return lista.sort((a, b) => b.ts - a.ts);
+}
+
+function pintarContadorNotificaciones(sinLeer) {
+  const punto = $(".notification-dot");
+  if (punto) {
+    punto.textContent   = String(sinLeer);
+    punto.style.display = sinLeer ? "" : "none";
+  }
+  const texto = $(".notifications-unread");
+  if (texto) texto.textContent = `${sinLeer} sin leer`;
+  $("#notifications-toggle")?.setAttribute(
+    "aria-label",
+    sinLeer ? `Notificaciones, ${sinLeer} sin leer` : "Notificaciones"
+  );
+}
+
+function marcarNotificacionesVistas() {
+  if (!estudianteUid || tutoriasEstado !== "listo") return;
+  const vistas = leerNotificacionesVistas();
+  construirNotificaciones().forEach((n) => vistas.add(n.key));
+  guardarNotificacionesVistas(vistas);
+  pintarContadorNotificaciones(0);
+}
+
+function renderNotificaciones() {
+  $(".notifications-demo")?.remove();
+  $("#notificaciones > .demo-notice")?.remove();
+
+  const vista   = $(".notifications-preview");
+  const completa = $(".notifications-full-list");
+  if (!vista && !completa) return;
+
+  const entrada = (n, h) => `
+    <li class="notification-entry${n.nueva ? " is-unread" : ""}">
+      <span class="notification-marker" aria-hidden="true"></span>
+      <div>
+        <${h}>${escapeHTML(n.titulo)}</${h}>
+        <p>${escapeHTML(n.texto)}</p>
+        <span class="notification-read-label">${n.nueva ? "Sin leer" : "Leída"}</span>
+      </div>
+    </li>`;
+
+  const sinDatos = (texto) => `
+    <li class="notification-entry"><span class="notification-marker" aria-hidden="true"></span>
+      <div><p>${texto}</p></div></li>`;
+
+  if (tutoriasEstado !== "listo") {
+    const texto = tutoriasEstado === "error"
+      ? "No pudimos cargar tus notificaciones."
+      : "Cargando tus notificaciones…";
+    if (vista)    vista.innerHTML    = sinDatos(texto);
+    if (completa) completa.innerHTML = sinDatos(texto);
+    pintarContadorNotificaciones(0);
+    return;
+  }
+
+  const vistas = leerNotificacionesVistas();
+  const items  = construirNotificaciones().map((n) => ({ ...n, nueva: !vistas.has(n.key) }));
+  const sinLeer = items.filter((n) => n.nueva).length;
+
+  const vacio = sinDatos("Todavía no tienes notificaciones.");
+  if (vista)    vista.innerHTML    = items.length ? items.slice(0, 3).map((n) => entrada(n, "h3")).join("") : vacio;
+  if (completa) completa.innerHTML = items.length ? items.slice(0, 30).map((n) => entrada(n, "h2")).join("") : vacio;
+
+  pintarContadorNotificaciones(sinLeer);
+  if (window.location.hash === "#notificaciones") marcarNotificacionesVistas();
 }
 
 /* ================================================================
    14. Entrada principal — onAuthStateChanged
    ================================================================ */
+function refrescarVistas() {
+  doRefreshSessions?.();
+  doRefreshTutores?.();
+  renderInicio();
+  renderNotificaciones();
+}
+
+async function reintentar(que) {
+  if (!estudianteUid) return;
+  if (que === "tutores") {
+    tutoresEstado = "cargando";
+    refrescarVistas();
+    await cargarTutores();
+  } else {
+    tutoriasEstado = "cargando";
+    refrescarVistas();
+    await cargarTutorias(estudianteUid);
+  }
+  refrescarVistas();
+}
+
+// Al entrar a "Todas las notificaciones" se consideran vistas
+window.addEventListener("hashchange", () => {
+  if (window.location.hash === "#notificaciones") marcarNotificacionesVistas();
+});
+
+// Estado inicial mientras Firebase responde: "Cargando…", nunca datos de ejemplo
+refrescarVistas();
+
 onAuthStateChanged(auth, async (usuario) => {
   if (!usuario) return; // auth.js redirige al login
 
   estudianteUid = usuario.uid;
 
-  // Carga en paralelo
+  // Los tres bloques cargan en paralelo y cada uno pinta su parte al llegar
   await Promise.all([
     cargarPerfil(usuario.uid),
-    cargarTutorias(usuario.uid),
-    cargarTutores()
+    cargarTutorias(usuario.uid).then(refrescarVistas),
+    cargarTutores().then(refrescarVistas)
   ]);
-
-  // Refrescar todas las vistas con datos reales
-  doRefreshSessions?.();
-  doRefreshTutores?.();
-  renderInicio();
 });

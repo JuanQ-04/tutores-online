@@ -1,0 +1,102 @@
+rules_version = '2';
+
+// ============================================================================
+//  PROPUESTA de reglas para TutoresOn-Line  —  NO PROBADA contra tu proyecto.
+//
+//  Cómo usarla: Firebase Console → Firestore Database → Reglas. Pega el
+//  contenido, pulsa «Simulador de reglas» y prueba estos casos ANTES de publicar:
+//    1) estudiante leyendo usuarios con rol=tutor y estado=aprobado   → permitido
+//    2) estudiante leyendo el documento de otro estudiante             → denegado
+//    3) tutor completando su perfil (incompleto → pendiente)           → permitido
+//
+//  Lo importante para «Buscar tutores»: un estudiante autenticado puede LEER
+//  los perfiles de tutores aprobados. Sin eso, la consulta falla con
+//  «permission-denied» y la lista no carga.
+//
+//  Ojo: esa regla expone TODOS los campos del documento del tutor (correo,
+//  nombre del PDF, etc.). Si más adelante quieres ocultarlos, guarda los datos
+//  públicos en otra colección (p. ej. «tutoresPublicos») y lee esa.
+// ============================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function esAdmin() {
+      return autenticado()
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin';
+    }
+
+    // ---------------------------------------------------------------- usuarios
+    match /usuarios/{uid} {
+      // Cualquiera (incluso sin sesión) puede leer los tutores aprobados:
+      // alimenta el catálogo público de buscar.html. Tu propio perfil o
+      // todos si eres admin requieren sesión.
+      allow read: if (resource.data.rol == 'tutor'
+                      && resource.data.estado in ['aprobado', 'aceptado'])
+        || (autenticado() && (request.auth.uid == uid || esAdmin()));
+
+      // Registro: solo tu propio documento y nunca como admin ni ya aprobado.
+      allow create: if autenticado()
+        && request.auth.uid == uid
+        && request.resource.data.rol in ['estudiante', 'tutor']
+        && request.resource.data.estado in ['activo', 'incompleto'];
+
+      // Editar tu perfil sin cambiar tu rol ni tu estado. Única excepción:
+      // el tutor envía su solicitud (incompleto → pendiente).
+      allow update: if autenticado() && (
+        esAdmin() ||
+        (request.auth.uid == uid
+          && request.resource.data.rol == resource.data.rol
+          && (request.resource.data.estado == resource.data.estado
+              || (resource.data.estado == 'incompleto'
+                  && request.resource.data.estado == 'pendiente')))
+      );
+    }
+
+    // ------------------------------------------------------------- solicitudes
+    match /solicitudes/{id} {
+      allow read: if autenticado() && (
+        resource.data.estudianteId == request.auth.uid ||
+        resource.data.tutorId == request.auth.uid ||
+        esAdmin()
+      );
+
+      allow create: if autenticado()
+        && request.resource.data.estudianteId == request.auth.uid
+        && request.resource.data.estado == 'pendiente';
+
+      // El estudiante solo puede cancelar (→ rechazada); el tutor acepta o rechaza.
+      allow update: if autenticado()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado'])
+        && (
+          (resource.data.estudianteId == request.auth.uid
+            && request.resource.data.estado == 'rechazada') ||
+          (resource.data.tutorId == request.auth.uid
+            && request.resource.data.estado in ['aceptada', 'rechazada'])
+        );
+    }
+
+    // ---------------------------------------------------------------- tutorias
+    match /tutorias/{id} {
+      allow read: if autenticado() && (
+        resource.data.estudianteId == request.auth.uid ||
+        resource.data.tutorId == request.auth.uid ||
+        esAdmin()
+      );
+
+      // La crea el tutor al aceptar una solicitud.
+      allow create: if autenticado()
+        && request.resource.data.tutorId == request.auth.uid
+        && request.resource.data.estado == 'programada';
+
+      allow update: if autenticado()
+        && (resource.data.estudianteId == request.auth.uid
+            || resource.data.tutorId == request.auth.uid)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['estado', 'enlaceReunion', 'calificacion', 'comentario']);
+    }
+  }
+}

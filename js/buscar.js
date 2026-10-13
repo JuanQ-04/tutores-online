@@ -1,65 +1,30 @@
 // js/buscar.js — Pantalla pública «Tutores disponibles»
 //
-// - Muestra los tutores y permite filtrarlos (materia, fecha, modalidad).
-// - Lee los filtros que llegan desde la landing (?materia=...&disponibilidad=...).
+// - Lee de Firestore los tutores aprobados (colección «usuarios») y los muestra
+//   como catálogo. No requiere sesión para ver.
+// - Filtros: texto, materia, fecha y modalidad (según los bloques de
+//   disponibilidad que el tutor publicó).
 // - «Reservar» exige sesión: sin sesión → login.html.
-//
-// Los tutores son datos de demostración (los mismos de js/estudiante.js).
-// `dias` = días de la semana en que atiende (0 = domingo … 6 = sábado).
+// - Lee los filtros que llegan desde la landing (?materia=...&disponibilidad=...).
 
 (() => {
   "use strict";
 
-  const TUTORES = [
-    {
-      id: 1,
-      name: "María Rodríguez",
-      subject: "Matemáticas",
-      nivel: "Secundaria · Bachillerato",
-      lugar: "Bogotá · Chapinero",
-      bio: "Te ayudo a entender lo que parecía difícil con ejemplos claros y un ritmo que se adapta a ti.",
-      rating: 4.9,
-      reviews: 38,
-      availability: "Disponible hoy",
-      availabilityRank: 0,
-      modality: "Virtual",
-      dias: [1, 2, 3, 4, 5],
-      photo: "../images/tutor-maria.webp",
-      tone: "tone-green"
-    },
-    {
-      id: 2,
-      name: "Diego Salazar",
-      subject: "Física",
-      nivel: "Bachillerato · Universidad",
-      lugar: "Disponible en línea",
-      bio: "Convertimos fórmulas en intuición. Sesiones prácticas para resolver problemas con confianza.",
-      rating: 4.8,
-      reviews: 24,
-      availability: "3 espacios esta semana",
-      availabilityRank: 2,
-      modality: "Virtual",
-      dias: [1, 3, 5, 6],
-      photo: "../images/tutor-diego.webp",
-      tone: "tone-blue"
-    },
-    {
-      id: 3,
-      name: "Inés Morales",
-      subject: "Inglés",
-      nivel: "Todos los niveles",
-      lugar: "Bogotá · Teusaquillo",
-      bio: "Conversaciones reales, objetivos concretos y un espacio amable para que te animes a hablar.",
-      rating: 5.0,
-      reviews: 51,
-      availability: "Disponible mañana",
-      availabilityRank: 1,
-      modality: "Presencial",
-      dias: [2, 4, 6],
-      photo: "../images/tutor-ines.webp",
-      tone: "tone-sand"
-    }
-  ];
+  const MATERIAS = {
+    matematicas: "Matemáticas",
+    fisica: "Física",
+    quimica: "Química",
+    programacion: "Programación",
+    idiomas: "Idiomas",
+    estadistica: "Estadística"
+  };
+
+  const ESTADOS_VISIBLES = ["aprobado", "aceptado"];
+  const TONES = ["tone-green", "tone-blue", "tone-sand"];
+
+  let TUTORES = [];
+  let estado = "cargando"; // cargando | listo | error
+  let tutorEnDialogo = null;
 
   const $ = (selector) => document.querySelector(selector);
 
@@ -72,8 +37,6 @@
   const fOrden = $("#f-orden");
   const dialog = $("#pub-dialog");
 
-  let tutorEnDialogo = null;
-
   /* ---------- Utilidades ---------- */
   function escapeHTML(value) {
     return String(value).replace(/[&<>"']/g, (c) => ({
@@ -82,16 +45,23 @@
   }
 
   function normalizar(value) {
-    return String(value)
+    return String(value || "")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
       .trim();
   }
 
-  function diaDeSemana(isoDate) {
-    const [y, m, d] = isoDate.split("-").map(Number);
-    return new Date(y, m - 1, d).getDay();
+  function pad(n) { return String(n).padStart(2, "0"); }
+
+  function hoyISO() {
+    const h = new Date();
+    return `${h.getFullYear()}-${pad(h.getMonth() + 1)}-${pad(h.getDate())}`;
+  }
+
+  function horaActual() {
+    const h = new Date();
+    return `${pad(h.getHours())}:${pad(h.getMinutes())}`;
   }
 
   function fechaLegible(isoDate) {
@@ -101,17 +71,74 @@
     });
   }
 
-  function hoyISO() {
-    const h = new Date();
-    return [
-      h.getFullYear(),
-      String(h.getMonth() + 1).padStart(2, "0"),
-      String(h.getDate()).padStart(2, "0")
-    ].join("-");
+  function materiaLabel(valor) {
+    const texto = String(valor || "").trim();
+    return MATERIAS[normalizar(texto)] || (texto.charAt(0).toUpperCase() + texto.slice(1));
+  }
+
+  function iniciales(nombre) {
+    return String(nombre).split(/\s+/).filter(Boolean).slice(0, 2)
+      .map((p) => p[0].toUpperCase()).join("") || "T";
   }
 
   const icono = (name) =>
     `<svg class="icon" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
+
+  function avatar(nombre, size) {
+    return `<div class="pub-photo" aria-hidden="true" style="width:${size}px;height:${size}px;border-radius:50%;
+      background:var(--color-primary,#6366f1);color:#fff;display:flex;align-items:center;
+      justify-content:center;font-size:${Math.round(size / 2.6)}px;font-weight:700">${escapeHTML(iniciales(nombre))}</div>`;
+  }
+
+  /* ---------- Carga desde Firestore ---------- */
+  async function cargarTutores() {
+    estado = "cargando";
+    render();
+    try {
+      const { db } = await import("./firebase-config.js");
+      const { collection, query, where, getDocs } = await import(
+        "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"
+      );
+
+      const snap = await getDocs(query(
+        collection(db, "usuarios"),
+        where("rol", "==", "tutor"),
+        where("estado", "in", ESTADOS_VISIBLES)
+      ));
+
+      const hoy = hoyISO();
+      const hora = horaActual();
+
+      TUTORES = snap.docs.map((d, i) => {
+        const data = d.data();
+        // Solo bloques que todavía no pasaron, del más próximo al más lejano
+        const disponibilidad = (Array.isArray(data.disponibilidad) ? data.disponibilidad : [])
+          .filter((b) => b && b.fecha &&
+            (b.fecha > hoy || (b.fecha === hoy && (b.horaFin || "23:59") > hora)))
+          .sort((a, b) => `${a.fecha}T${a.horaInicio}`.localeCompare(`${b.fecha}T${b.horaInicio}`));
+
+        const nombre = `${data.nombre || ""} ${data.apellido || ""}`.trim() || "Tutor";
+        return {
+          id: d.id,
+          name: nombre,
+          materias: (Array.isArray(data.materias) ? data.materias : []),
+          subject: (Array.isArray(data.materias) ? data.materias : []).map(materiaLabel).join(", ") || "General",
+          titulo: data.titulo || "Profesional",
+          lugar: data.ciudad || "Colombia",
+          bio: data.presentacion || "Tutor registrado en la plataforma.",
+          tarifa: Number(data.tarifa) || 0,
+          disponibilidad,
+          tone: TONES[i % TONES.length]
+        };
+      });
+      estado = "listo";
+    } catch (error) {
+      console.error("No se pudieron cargar los tutores:", error);
+      TUTORES = [];
+      estado = "error";
+    }
+    render();
+  }
 
   /* ---------- Filtrado ---------- */
   function tutoresFiltrados() {
@@ -126,50 +153,56 @@
         normalizar(t.name).includes(texto) ||
         normalizar(t.subject).includes(texto) ||
         normalizar(t.bio).includes(texto);
-      const coincideMateria = !materia || normalizar(t.subject) === materia;
-      const coincideModalidad = !modalidad || normalizar(t.modality) === modalidad;
-      const coincideFecha = !fecha || t.dias.includes(diaDeSemana(fecha));
-      return coincideTexto && coincideMateria && coincideModalidad && coincideFecha;
+      const coincideMateria = !materia || t.materias.some((m) => normalizar(m) === materia);
+
+      // Fecha y modalidad se evalúan sobre los mismos bloques
+      const coincideBloque = !fecha && !modalidad
+        ? true
+        : t.disponibilidad.some((b) =>
+            (!fecha || b.fecha === fecha) &&
+            (!modalidad || normalizar(b.modalidad) === modalidad));
+
+      return coincideTexto && coincideMateria && coincideBloque;
     });
 
     const orden = fOrden.value;
-    if (orden === "disponibilidad") {
-      return lista.sort((a, b) => a.availabilityRank - b.availabilityRank);
-    }
-    if (orden === "reseñas") {
-      return lista.sort((a, b) => b.reviews - a.reviews);
-    }
-    return lista.sort((a, b) => b.rating - a.rating);
+    if (orden === "tarifa") return lista.sort((a, b) => a.tarifa - b.tarifa);
+    if (orden === "nombre") return lista.sort((a, b) => a.name.localeCompare(b.name, "es"));
+    // Por defecto: quien tiene el horario más próximo primero
+    const proximo = (t) => t.disponibilidad.length
+      ? `${t.disponibilidad[0].fecha}T${t.disponibilidad[0].horaInicio}`
+      : "9999";
+    return lista.sort((a, b) => proximo(a).localeCompare(proximo(b)));
   }
 
   /* ---------- Pintado ---------- */
-  function tarjeta(t) {
-    const disponibilidad = fFecha.value
-      ? `Disponible el ${fechaLegible(fFecha.value)}`
-      : t.availability;
+  function textoDisponibilidad(t) {
+    const n = t.disponibilidad.length;
+    if (!n) return "Sin horarios por ahora";
+    return n === 1 ? "1 horario disponible" : `${n} horarios disponibles`;
+  }
 
+  function tarjeta(t) {
+    const prox = t.disponibilidad[0];
     return `
       <article class="pub-card ${t.tone}">
-        <div class="pub-cover">
-          <img class="pub-photo" src="${t.photo}" alt="Foto de ${escapeHTML(t.name)}" width="104" height="104">
-        </div>
+        <div class="pub-cover">${avatar(t.name, 104)}</div>
         <div class="pub-body">
           <p class="pub-subject">${escapeHTML(t.subject)}</p>
           <h2>${escapeHTML(t.name)}</h2>
           <p class="pub-bio">${escapeHTML(t.bio)}</p>
           <ul class="pub-meta">
-            <li>${icono("cap")}${escapeHTML(t.nivel)}</li>
+            <li>${icono("cap")}${escapeHTML(t.titulo)}</li>
             <li>${icono("pin")}${escapeHTML(t.lugar)}</li>
-            <li>${icono(t.modality === "Presencial" ? "pin" : "video")}${escapeHTML(t.modality)}</li>
+            ${prox ? `<li>${icono("clock")}Próximo: ${escapeHTML(fechaLegible(prox.fecha))} · ${escapeHTML(prox.horaInicio)}</li>` : ""}
           </ul>
           <div class="pub-rating">
-            <span class="pub-stars" aria-hidden="true">${icono("star").repeat(5)}</span>
-            <strong>${t.rating}</strong><small>(${t.reviews})</small>
-            <span class="pub-availability">${escapeHTML(disponibilidad)}</span>
+            <span class="pub-availability">${escapeHTML(textoDisponibilidad(t))}</span>
+            ${t.tarifa ? `<small>$${t.tarifa.toLocaleString("es-CO")}/hora</small>` : ""}
           </div>
           <div class="pub-actions">
-            <button class="pub-btn pub-btn-outline" type="button" data-perfil="${t.id}">Ver perfil</button>
-            <button class="pub-btn pub-btn-solid" type="button" data-reservar="${t.id}">
+            <button class="pub-btn pub-btn-outline" type="button" data-perfil="${escapeHTML(t.id)}">Ver perfil</button>
+            <button class="pub-btn pub-btn-solid" type="button" data-reservar="${escapeHTML(t.id)}">
               ${icono("calendar")}Reservar
             </button>
           </div>
@@ -178,6 +211,17 @@
   }
 
   function render() {
+    if (estado === "cargando") {
+      count.textContent = "Cargando tutores…";
+      grid.innerHTML = '<p class="pub-empty">Cargando tutores…</p>';
+      return;
+    }
+    if (estado === "error") {
+      count.textContent = "";
+      grid.innerHTML = '<p class="pub-empty">No pudimos cargar los tutores en este momento. Intenta de nuevo en unos minutos.</p>';
+      return;
+    }
+
     const lista = tutoresFiltrados();
 
     count.innerHTML = lista.length === 1
@@ -190,18 +234,15 @@
   }
 
   /* ---------- Reserva: exige sesión ---------- */
-  // Guardamos qué tutor quería reservar para retomarlo en el panel del
-  // estudiante una vez inicie sesión (lo lee js/estudiante.js).
+  // Guardamos qué tutor quería reservar para retomarlo tras iniciar sesión.
   const CLAVE_RESERVA = "tutorReservaPendiente";
 
   async function reservar(tutorId) {
     try {
       sessionStorage.setItem(CLAVE_RESERVA, String(tutorId));
-    } catch (_) { /* sessionStorage no disponible: no es crítico */ }
+    } catch (_) { /* no es crítico */ }
 
     try {
-      // Import dinámico: si Firebase no carga, la página sigue funcionando
-      // y simplemente enviamos al login.
       const { auth, db } = await import("./firebase-config.js");
       await auth.authStateReady();
 
@@ -237,17 +278,21 @@
     tutorEnDialogo = tutor;
     dialog.className = `pub-dialog ${tutor.tone}`;
 
-    $("#pd-photo").src = tutor.photo;
-    $("#pd-photo").alt = `Foto de ${tutor.name}`;
+    $("#pd-avatar").innerHTML = avatar(tutor.name, 104);
     $("#pd-subject").textContent = tutor.subject;
     $("#pd-name").textContent = tutor.name;
     $("#pd-rating").textContent =
-      `★ ${tutor.rating} (${tutor.reviews} opiniones) · ${tutor.availability}`;
+      `${textoDisponibilidad(tutor)}${tutor.tarifa ? ` · $${tutor.tarifa.toLocaleString("es-CO")}/hora` : ""}`;
     $("#pd-bio").textContent = tutor.bio;
+
+    const bloques = tutor.disponibilidad.slice(0, 5).map((b) =>
+      `<li>${icono("clock")}${escapeHTML(fechaLegible(b.fecha))} · ${escapeHTML(b.horaInicio)} – ${escapeHTML(b.horaFin)} · ${escapeHTML(b.modalidad)}</li>`
+    ).join("");
+
     $("#pd-meta").innerHTML = `
-      <li>${icono("cap")}${escapeHTML(tutor.nivel)}</li>
+      <li>${icono("cap")}${escapeHTML(tutor.titulo)}</li>
       <li>${icono("pin")}${escapeHTML(tutor.lugar)}</li>
-      <li>${icono(tutor.modality === "Presencial" ? "pin" : "video")}${escapeHTML(tutor.modality)}</li>`;
+      ${bloques}`;
 
     dialog.showModal();
   }
@@ -256,7 +301,7 @@
   document.addEventListener("click", (event) => {
     const btnPerfil = event.target.closest("[data-perfil]");
     if (btnPerfil) {
-      const t = TUTORES.find((x) => String(x.id) === btnPerfil.dataset.perfil);
+      const t = TUTORES.find((x) => x.id === btnPerfil.dataset.perfil);
       if (t) abrirPerfil(t);
       return;
     }
@@ -292,7 +337,7 @@
     fMateria.value = "";
     fFecha.value = "";
     fModalidad.value = "";
-    fOrden.value = "rating";
+    fOrden.value = "proximo";
     render();
   });
 
@@ -314,5 +359,5 @@
     fFecha.value = fecha;
   }
 
-  render();
+  cargarTutores();
 })();
