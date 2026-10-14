@@ -120,7 +120,7 @@
       const hoy = hoyISO();
       const hora = horaActual();
 
-      TUTORES = snap.docs.map((d, i) => {
+      TUTORES = snap.docs.filter((d) => d.data().activo !== false).map((d, i) => {
         const data = d.data();
         // Solo bloques que todavía no pasaron, del más próximo al más lejano
         const disponibilidad = (Array.isArray(data.disponibilidad) ? data.disponibilidad : [])

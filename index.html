@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>TutoresOn-Line</title>
+  <link rel="icon" type="image/webp" href="images/logo.webp">
 
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
@@ -201,7 +202,7 @@
 
           </div>
 
-          <!-- Contenido de demostración -->
+          <!-- Contenido de la página -->
           <div class="hero-proof">
 
             <div class="avatar-stack">
@@ -236,7 +237,7 @@
               <span
                 class="stars"
                 role="img"
-                aria-label="Cinco estrellas, muestra del prototipo"
+                aria-label="Cinco estrellas"
               >
                 ★★★★★
               </span>
@@ -257,7 +258,7 @@
             fetchpriority="high"
           >
 
-          <!-- Aviso superior: ejemplo visual, no una reserva real. -->
+          <!-- Aviso superior decorativo -->
           <div class="hero-note note-top">
 
             <span
@@ -284,17 +285,17 @@
 
           </div>
 
-          <!-- Aviso inferior: fecha y materia de ejemplo del boceto. -->
+          <!-- Aviso inferior decorativo -->
           <div class="hero-note note-bottom">
 
             <div class="mini-calendar">
-              <span>AGO</span>
-              <b>28</b>
+              <span id="hero-cal-mes">HOY</span>
+              <b id="hero-cal-dia">&nbsp;</b>
             </div>
 
             <div class="hero-note-copy">
-              <b>Matemáticas</b>
-              <span>Mié · 4:00 PM</span>
+              <b>Agenda tu tutoría</b>
+              <span>Elige día y hora</span>
             </div>
 
             <svg
@@ -658,5 +659,14 @@
 
   <script src="js/landing.js"></script>
 
+  <script>
+    // Fecha del día en la tarjeta decorativa del hero
+    (function () {
+      var hoy = new Date();
+      var mes = hoy.toLocaleDateString("es-CO", { month: "short" }).replace(".", "").toUpperCase();
+      document.getElementById("hero-cal-mes").textContent = mes;
+      document.getElementById("hero-cal-dia").textContent = hoy.getDate();
+    })();
+  </script>
 </body>
 </html>

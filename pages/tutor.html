@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Panel del tutor de TutoresOn-Line">
   <title>Inicio | TutoresOn-Line</title>
+  <link rel="icon" type="image/webp" href="../images/logo.webp">
 
   <link rel="stylesheet" href="../css/base.css">
   <link rel="stylesheet" href="../css/components.css">
@@ -219,11 +220,6 @@
       <main class="dashboard-main" id="contenido-principal">
         <!-- Inicio -->
         <section id="inicio" aria-labelledby="tutor-home-title">
-          <p class="demo-notice">
-            Demostración: los datos y las fechas son de ejemplo.
-            Los cambios se mantienen solo mientras esta página esté abierta.
-          </p>
-
           <div class="tutor-page-heading">
             <div>
               <p class="tutor-eyebrow">Tu espacio profesional</p>
@@ -253,7 +249,7 @@
                 <svg class="icon" aria-hidden="true"><use href="#t-clock"></use></svg>
               </span>
               <div>
-                <p class="tutor-label">Próxima sesión de ejemplo</p>
+                <p class="tutor-label">Próxima sesión</p>
                 <strong id="tutor-stat-next">—</strong>
                 <small id="tutor-stat-subject">Sin sesiones confirmadas</small>
               </div>
@@ -289,7 +285,7 @@
             <section class="tutor-surface" aria-labelledby="availability-summary-title">
               <div class="tutor-section-heading">
                 <div>
-                  <p class="tutor-eyebrow">Semana de ejemplo</p>
+                  <p class="tutor-eyebrow">Tu agenda</p>
                   <h2 id="availability-summary-title">Tu disponibilidad</h2>
                 </div>
                 <a class="tutor-icon-button" href="#disponibilidad" aria-label="Gestionar disponibilidad">
@@ -351,7 +347,7 @@
             <div>
               <p class="tutor-eyebrow">Tu agenda profesional</p>
               <h1 id="availability-title">Disponibilidad</h1>
-              <p>Organiza bloques horarios de demostración.</p>
+              <p>Organiza los bloques horarios en los que das tutorías.</p>
             </div>
             <button class="tutor-button" id="tutor-add-block" type="button">
               <svg class="icon" aria-hidden="true"><use href="#t-plus"></use></svg>
@@ -394,8 +390,7 @@
               </ul>
 
               <p class="tutor-calendar-note">
-                Estos bloques no se publican ni se guardan todavía.
-                Al recargar se restablecen los datos de ejemplo.
+                Los estudiantes pueden reservar los bloques que agregues aquí.
               </p>
 
               <h3 class="tutor-label">Bloques disponibles de esta semana</h3>
@@ -433,9 +428,6 @@
             </button>
           </div>
 
-          <p class="tutor-muted">
-            Se muestran sesiones de ejemplo; todavía no se filtran por la fecha actual.
-          </p>
           <div class="tutor-session-list" id="tutor-session-list"></div>
         </section>
 
@@ -445,7 +437,7 @@
             <div>
               <p class="tutor-eyebrow">Novedades</p>
               <h1 id="tutor-notifications-title">Notificaciones</h1>
-              <p>Movimientos de tus solicitudes y sesiones de demostración.</p>
+              <p>Movimientos de tus solicitudes y sesiones.</p>
             </div>
             <button class="tutor-button is-outline" id="tutor-notifications-back" type="button">
               Volver
@@ -472,7 +464,7 @@
           </div>
 
           <p class="demo-notice" id="tutor-profile-note" role="status" aria-live="polite">
-            Los cambios solo se reflejan en esta demostración.
+            Cargando tu perfil…
           </p>
 
           <div class="tutor-profile-layout">
@@ -485,7 +477,7 @@
                   </button>
                 </span>
                 <div>
-                  <h2 id="tutor-profile-name">María Rodríguez</h2>
+                  <h2 id="tutor-profile-name">Tutor</h2>
                   <p class="tutor-muted">Tutor de TutoresOn-Line</p>
                 </div>
               </div>
@@ -493,27 +485,27 @@
               <div class="tutor-profile-fields">
                 <label class="tutor-field">
                   <span>Nombre</span>
-                  <input id="tutor-name" type="text" value="María" autocomplete="given-name" maxlength="60" required>
+                  <input id="tutor-name" type="text" value="" autocomplete="given-name" maxlength="60" required>
                 </label>
                 <label class="tutor-field">
                   <span>Apellido</span>
-                  <input id="tutor-lastname" type="text" value="Rodríguez" autocomplete="family-name" maxlength="60" required>
+                  <input id="tutor-lastname" type="text" value="" autocomplete="family-name" maxlength="60" required>
                 </label>
                 <label class="tutor-field tutor-field-full">
                   <span>Correo electrónico</span>
-                  <input id="tutor-email" type="email" value="maria@correo.com" autocomplete="email" readonly required>
+                  <input id="tutor-email" type="email" value="" autocomplete="email" readonly required>
                 </label>
                 <label class="tutor-field">
                   <span>Ciudad</span>
-                  <input id="tutor-city" type="text" value="Bogotá" maxlength="80" required>
+                  <input id="tutor-city" type="text" value="" maxlength="80" required>
                 </label>
                 <label class="tutor-field">
                   <span>Tarifa por hora (COP)</span>
-                  <input id="tutor-rate" type="number" value="30000" min="1000" step="1000" required>
+                  <input id="tutor-rate" type="number" value="" min="1000" step="1000" required>
                 </label>
                 <label class="tutor-field tutor-field-full">
                   <span>Presentación</span>
-                  <textarea id="tutor-presentation" rows="4" maxlength="500" required>Te ayudo a entender lo que parecía difícil con ejemplos claros y un ritmo que se adapta a ti.</textarea>
+                  <textarea id="tutor-presentation" rows="4" maxlength="500" required></textarea>
                 </label>
               </div>
             </form>
@@ -643,11 +635,15 @@
         </label>
         <label class="tutor-field">
           <span>Hora de inicio</span>
-          <input id="tutor-block-start" type="time" min="08:00" max="19:30" step="1800" required>
+          <select id="tutor-block-start" required>
+            <option value="">Selecciona</option>
+          </select>
         </label>
         <label class="tutor-field">
           <span>Hora de fin</span>
-          <input id="tutor-block-end" type="time" min="08:30" max="20:00" step="1800" required>
+          <select id="tutor-block-end" required>
+            <option value="">Selecciona</option>
+          </select>
         </label>
         <label class="tutor-field">
           <span>Modalidad</span>
@@ -660,7 +656,7 @@
       </div>
 
       <p class="tutor-form-error" id="tutor-block-error" role="alert"></p>
-      <button class="tutor-button" type="submit">Agregar a la demostración</button>
+      <button class="tutor-button" type="submit">Agregar bloque</button>
     </form>
   </dialog>
 

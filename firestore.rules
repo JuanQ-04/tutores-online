@@ -2,7 +2,7 @@ rules_version = '2';
 
 // ============================================================================
 //  PROPUESTA de reglas para TutoresOn-Line  —  NO PROBADA contra tu proyecto.
-//  Actualización: se agregaron «calificaciones» y «mensajesSoporte» al final.
+//  Actualización: se agregaron «calificaciones», «mensajesSoporte» y «hojasDeVida».
 //
 //  Cómo usarla: Firebase Console → Firestore Database → Reglas. Pega el
 //  contenido, pulsa «Simulador de reglas» y prueba estos casos ANTES de publicar:
@@ -159,6 +159,26 @@ service cloud.firestore {
 
       allow update: if esAdmin()
         && request.resource.data.estado in ['abierto', 'revision', 'resuelto'];
+    }
+
+    // ------------------------------------------------------------ hojasDeVida
+    // NUEVO. PDF de la hoja de vida del tutor (data URL en base64). El id del
+    // documento es el uid del tutor. Lo escribe el propio tutor mientras su
+    // estado es «incompleto» (antes de enviar la solicitud); lo lee él mismo
+    // y el administrador, que es quien decide aprobar o rechazar.
+    match /hojasDeVida/{uid} {
+      allow read: if autenticado() && (request.auth.uid == uid || esAdmin());
+
+      allow create, update: if autenticado()
+        && request.auth.uid == uid
+        && get(/databases/$(database)/documents/usuarios/$(uid)).data.rol == 'tutor'
+        && get(/databases/$(database)/documents/usuarios/$(uid)).data.estado == 'incompleto'
+        && request.resource.data.tutorId == uid
+        && request.resource.data.dataURL is string
+        && request.resource.data.dataURL.matches('data:application/pdf;base64,.*')
+        && request.resource.data.dataURL.size() < 950000;
+
+      allow delete: if esAdmin();
     }
   }
 }

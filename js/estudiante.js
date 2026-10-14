@@ -237,7 +237,7 @@ let doRefreshTutores   = null;
 }
 
 /* ================================================================
-   2. Notificaciones (campana + vista completa — demostración)
+   2. Notificaciones (campana + vista completa)
    ================================================================ */
 {
   const widget              = $("#notifications-widget");
@@ -921,7 +921,7 @@ async function cargarTutores() {
       where("estado", "in", ["aprobado", "aceptado"])
     );
     const snap = await conTimeout(getDocs(q));
-    tutoresData = snap.docs.map((d) => {
+    tutoresData = snap.docs.filter((d) => d.data().activo !== false).map((d) => {
       const data = d.data();
       // Solo bloques que todavía no pasaron, del más próximo al más lejano
       const disponibilidad = (Array.isArray(data.disponibilidad) ? data.disponibilidad : [])
@@ -1547,7 +1547,7 @@ function mensajeVacio(html, rol = "status") {
 }
 
 function renderInicio() {
-  // El aviso "Vista de demostración" ya no aplica en Inicio
+  // Quitar el aviso estático del HTML: en Inicio ya se muestran datos reales
   $("#inicio > .demo-notice")?.remove();
 
   const ahora = new Date();

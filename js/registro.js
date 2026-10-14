@@ -3,10 +3,10 @@ const roleInputs = form.querySelectorAll('input[name="tipo-cuenta"]');
 const roleHelp = document.getElementById("registro-role-help");
 const button = document.getElementById("btn-registro");
 const buttonText = button.querySelector("span");
-const statusNote = document.getElementById("registro-demo-note");
+const statusNote = document.getElementById("registro-form-note");
 
-const DEMO_MESSAGE =
-  "Vista de demostración: no se guardan datos ni se crean cuentas.";
+// Texto de apoyo bajo el botón: vacío salvo cuando hay algo que avisar.
+const FORM_NOTE = "";
 
 // Avisos accesibles sin usar ventanas emergentes.
 statusNote.setAttribute("role", "status");
@@ -29,7 +29,7 @@ function updateRegistrationView() {
       + "puedas ofrecer tutorías."
     : "Completa tus datos para registrarte como estudiante.";
 
-  statusNote.textContent = DEMO_MESSAGE;
+  statusNote.textContent = FORM_NOTE;
 
   // El botón ya permite probar las validaciones del formulario.
   button.disabled = false;
@@ -92,7 +92,7 @@ function handleContinue(event) {
   // Combina nuestras reglas con required, type="email" y los términos.
   if (!form.reportValidity()) {
     statusNote.textContent =
-      "Revisa el campo indicado antes de continuar. No se han guardado datos.";
+      "Revisa el campo indicado antes de continuar.";
     return;
   }
 
@@ -102,7 +102,7 @@ function handleContinue(event) {
     return;
   }
 
-  statusNote.textContent = DEMO_MESSAGE;
+  statusNote.textContent = FORM_NOTE;
 }
 
 // Limpia el error anterior al corregir un campo y restablece el aviso.
@@ -113,7 +113,7 @@ form.addEventListener("input", (event) => {
     input.setCustomValidity("");
   }
 
-  statusNote.textContent = DEMO_MESSAGE;
+  statusNote.textContent = FORM_NOTE;
 });
 
 roleInputs.forEach((input) => {

@@ -53,8 +53,8 @@ function mensajeDeError(codigo) {
 // en el aviso del formulario del tutor. Si no hay dónde, usa alert().
 function mostrarError(texto) {
   const destino = document.getElementById("auth-alert")
-    || document.getElementById("registro-demo-note")
-    || document.getElementById("tutor-demo-note");
+    || document.getElementById("registro-form-note")
+    || document.getElementById("tutor-form-note");
 
   if (!destino) {
     console.error("No se encontró un lugar para mostrar el error:", texto);
@@ -118,16 +118,33 @@ window.registrarNuevoUsuario = async function (rol) {
    Completar perfil profesional del tutor
    (lo llama js/registro-tutor.js al enviar su formulario)
    --------------------------------------------------------- */
-window.completarPerfilTutor = async function (datos) {
+window.completarPerfilTutor = async function (datos, hojaVida) {
   if (!auth.currentUser) {
     mostrarError("Tu sesión expiró. Vuelve a iniciar sesión.");
     return;
   }
 
+  const uid = auth.currentUser.uid;
+
   try {
-    const refPerfil = doc(db, "usuarios", auth.currentUser.uid);
-    await updateDoc(refPerfil, {
+    // 1) El PDF va en su propia colección (hojasDeVida/{uid}) para que no
+    //    quede expuesto en el perfil público del tutor ni pese en cada lectura.
+    //    Se guarda ANTES de pasar a «pendiente»: las reglas solo dejan
+    //    escribirlo mientras el estado sigue en «incompleto».
+    if (hojaVida?.dataURL) {
+      await setDoc(doc(db, "hojasDeVida", uid), {
+        tutorId: uid,
+        nombreArchivo: hojaVida.nombreArchivo,
+        tamano: hojaVida.tamano,
+        dataURL: hojaVida.dataURL,
+        subidaEn: serverTimestamp()
+      });
+    }
+
+    // 2) Perfil profesional + paso a «pendiente»: así le aparece al admin.
+    await updateDoc(doc(db, "usuarios", uid), {
       ...datos,
+      tieneHojaVida: Boolean(hojaVida?.dataURL),
       estado: "pendiente",
       solicitudEnviadaEn: serverTimestamp()
     });
@@ -137,7 +154,9 @@ window.completarPerfilTutor = async function (datos) {
   } catch (error) {
     console.error("No se pudo enviar la solicitud:", error);
     mostrarError(
-      "No se pudo enviar la solicitud. Revisa tu conexión e inténtalo de nuevo."
+      error?.code === "permission-denied"
+        ? "Firestore rechazó el envío (permission-denied). Revisa que publicaste las reglas actualizadas."
+        : "No se pudo enviar la solicitud. Revisa tu conexión e inténtalo de nuevo."
     );
   }
 };
@@ -168,6 +187,13 @@ async function redirigirAlPanel() {
     const refPerfil = doc(db, "usuarios", auth.currentUser.uid);
     const snap = await getDoc(refPerfil);
     if (snap.exists()) {
+      // Cuenta suspendida por el administrador (activo = false): no entra.
+      if (snap.data().activo === false) {
+        await signOut(auth);
+        sesionRecienIniciada = false;
+        mostrarError("Tu cuenta está suspendida. Contacta al equipo de TutoresOn-Line.");
+        return;
+      }
       rol = snap.data().rol || "estudiante";
       estado = snap.data().estado || "";
     }
@@ -304,6 +330,18 @@ onAuthStateChanged(auth, async (usuario) => {
       const enlace = document.getElementById("auth-ir-panel");
       if (aviso) aviso.style.display = "block";
       if (enlace) enlace.href = destinoSegunRol(rol, estado);
+    }
+    // Sesión abierta en un panel y el admin suspendió la cuenta: sacarla.
+    if (PAGINAS_PROTEGIDAS.includes(paginaActual)) {
+      try {
+        const snap = await getDoc(doc(db, "usuarios", usuario.uid));
+        if (snap.exists() && snap.data().activo === false) {
+          await signOut(auth);
+          window.location.href = "login.html";
+        }
+      } catch (error) {
+        console.warn("No se pudo comprobar el estado de la cuenta:", error);
+      }
     }
   } else {
     if (PAGINAS_PROTEGIDAS.includes(paginaActual)) {

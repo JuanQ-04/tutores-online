@@ -1,5 +1,5 @@
 const form = document.getElementById("tutor-form");
-const statusNote = document.getElementById("tutor-demo-note");
+const statusNote = document.getElementById("tutor-form-note");
 
 const titleInput = document.getElementById("titulo");
 const institutionInput = document.getElementById("institucion");
@@ -21,8 +21,22 @@ const fields = [
   ...form.querySelectorAll("input, select, textarea")
 ];
 
-const DEMO_MESSAGE =
-  "Vista de demostración: no se guardan datos ni se envían solicitudes.";
+// Límite del PDF: se guarda dentro de Firestore (máx. 1 MiB por documento) y
+// el base64 pesa ~33 % más que el archivo, así que 700 KB deja margen.
+const MAX_PDF_BYTES = 700 * 1024;
+
+const FORM_NOTE =
+  "Tu solicitud será revisada por el equipo administrador antes de activar tu perfil.";
+
+// Lee el PDF y lo devuelve como data URL (data:application/pdf;base64,...).
+function leerArchivoComoDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const lector = new FileReader();
+    lector.onload = () => resolve(lector.result);
+    lector.onerror = () => reject(lector.error);
+    lector.readAsDataURL(file);
+  });
+}
 
 statusNote.setAttribute("role", "status");
 statusNote.setAttribute("aria-live", "polite");
@@ -133,8 +147,7 @@ function validateTutorForm() {
     "Selecciona al menos una franja de disponibilidad."
   );
 
-  // Comprobación básica del archivo seleccionado.
-  // No inspecciona el contenido del archivo ni lo sube.
+  // Comprobación básica del archivo seleccionado (extensión, tipo y tamaño).
   const file = fileInput.files[0];
 
   if (!file) {
@@ -147,6 +160,10 @@ function validateTutorForm() {
     if (!hasPdfExtension || !hasCompatibleType) {
       fileInput.setCustomValidity(
         "Selecciona un archivo PDF para la hoja de vida."
+      );
+    } else if (file.size > MAX_PDF_BYTES) {
+      fileInput.setCustomValidity(
+        "El PDF pesa más de 700 KB. Comprímelo e inténtalo de nuevo."
       );
     }
   }
@@ -162,44 +179,67 @@ function validateTutorForm() {
   return form.reportValidity();
 }
 
-form.addEventListener("submit", (event) => {
+let enviando = false;
+
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (enviando) return; // evita doble clic mientras sube el PDF
 
   if (!validateTutorForm()) {
     statusNote.textContent =
       "Revisa el campo indicado antes de continuar. "
-      + "No se han guardado datos.";
+      + "Tu solicitud todavía no se ha enviado.";
     return;
   }
 
-  // El formulario ya validó → completar el perfil del tutor en Firebase.
-  if (typeof completarPerfilTutor === "function") {
-    completarPerfilTutor({
-      titulo: titleInput.value,
-      institucion: institutionInput.value,
-      ciudad: cityInput.value,
-      presentacion: presentationInput.value,
-      materias: subjectInputs
-        .filter((input) => input.checked)
-        .map((input) => input.value),
-      franjas: timeInputs
-        .filter((input) => input.checked)
-        .map((input) => input.value),
-      tarifa: Number(tarifaInput.value) || 0,
-      hojaVidaPDF: fileInput.files[0]?.name || ""
-    });
+  // js/auth.js (módulo) define completarPerfilTutor en window.
+  if (typeof completarPerfilTutor !== "function") {
+    console.error(
+      "completarPerfilTutor no está definida. "
+      + "¿Se cargó js/auth.js? Revisa la consola por errores de red o de módulo."
+    );
+    statusNote.textContent =
+      "Error interno: la autenticación no se cargó. "
+      + "Abre la consola (F12) y verifica que js/auth.js exista y que "
+      + "registro-tutor.html lo cargue como script type=\"module\".";
     return;
   }
 
-  // Si llegas aquí, js/auth.js no se cargó: no define completarPerfilTutor.
-  console.error(
-    "completarPerfilTutor no está definida. "
-    + "¿Se cargó js/auth.js? Revisa la consola por errores de red o de módulo."
-  );
-  statusNote.textContent =
-    "Error interno: la autenticación no se cargó. "
-    + "Abre la consola (F12) y verifica que js/auth.js exista y que "
-    + "registro-tutor.html lo cargue como script type=\"module\".";
+  const submitButton = form.querySelector('[type="submit"]');
+  enviando = true;
+  if (submitButton) submitButton.disabled = true;
+  statusNote.textContent = "Enviando tu solicitud…";
+
+  try {
+    const archivo = fileInput.files[0];
+    const dataURL = await leerArchivoComoDataURL(archivo);
+
+    await completarPerfilTutor(
+      {
+        titulo: titleInput.value,
+        institucion: institutionInput.value,
+        ciudad: cityInput.value,
+        presentacion: presentationInput.value,
+        materias: subjectInputs
+          .filter((input) => input.checked)
+          .map((input) => input.value),
+        franjas: timeInputs
+          .filter((input) => input.checked)
+          .map((input) => input.value),
+        tarifa: Number(tarifaInput.value) || 0,
+        hojaVidaPDF: archivo.name
+      },
+      { nombreArchivo: archivo.name, tamano: archivo.size, dataURL }
+    );
+  } catch (error) {
+    console.error("No se pudo leer el PDF:", error);
+    statusNote.textContent =
+      "No se pudo leer el archivo PDF. Selecciónalo de nuevo.";
+  } finally {
+    // Si todo salió bien auth.js redirige; si falló, se puede reintentar.
+    enviando = false;
+    if (submitButton) submitButton.disabled = false;
+  }
 });
 
 // Retira errores y avisos desactualizados al modificar un campo.
@@ -230,7 +270,7 @@ function handleFieldEdit(event) {
     updatePresentationCount();
   }
 
-  statusNote.textContent = DEMO_MESSAGE;
+  statusNote.textContent = FORM_NOTE;
 }
 
 form.addEventListener("input", handleFieldEdit);
@@ -238,4 +278,4 @@ form.addEventListener("change", handleFieldEdit);
 
 // Estado inicial.
 updatePresentationCount();
-statusNote.textContent = DEMO_MESSAGE;
+statusNote.textContent = FORM_NOTE;

@@ -1,7 +1,7 @@
 // js/tutor.js — Panel del tutor
 // Perfil, Solicitudes, Tutorías, Disponibilidad y Calificaciones conectados a
 // Firestore. Seguridad y Centro de ayuda: js/configuracion.js.
-// Notificaciones siguen con datos de demostración.
+// Las notificaciones se arman con las solicitudes y tutorías del tutor.
 
 import { auth, db } from "./firebase-config.js";
 import {
@@ -312,7 +312,7 @@ import {
   });
 
   // ----------------------------------------------------------------
-  // Notificaciones (UI — datos de demostración)
+  // Notificaciones
   // ----------------------------------------------------------------
 
   const notificationToggle = $("#tutor-notification-toggle");
@@ -778,8 +778,38 @@ import {
     renderCalendar();
   });
 
+  // Horas permitidas: de 08:00 a 20:00, solo en punto y y media.
+  function fillHourSelects() {
+    const opciones = [];
+    for (let m = 480; m <= 1200; m += 30) {
+      const valor = `${String(Math.floor(m / 60)).padStart(2, "0")}:${m % 60 === 0 ? "00" : "30"}`;
+      opciones.push({ valor, minutos: m, texto: timeLabel(valor) });
+    }
+    const pintar = (select, lista) => {
+      select.innerHTML =
+        '<option value="">Selecciona</option>' +
+        lista.map((o) => `<option value="${o.valor}">${escapeHTML(o.texto)}</option>`).join("");
+    };
+    pintar($("#tutor-block-start"), opciones.filter((o) => o.minutos <= 1170)); // hasta 19:30
+    pintar($("#tutor-block-end"), opciones.filter((o) => o.minutos >= 510));    // desde 08:30
+  }
+
+  // La hora de fin solo permite horas posteriores a la de inicio.
+  function updateEndOptions() {
+    const inicio = $("#tutor-block-start").value;
+    const fin = $("#tutor-block-end");
+    Array.from(fin.options).forEach((opt) => {
+      opt.disabled = Boolean(inicio && opt.value && minutes(opt.value) <= minutes(inicio));
+    });
+    if (fin.value && fin.selectedOptions[0]?.disabled) fin.value = "";
+  }
+
+  fillHourSelects();
+  $("#tutor-block-start").addEventListener("change", updateEndOptions);
+
   $("#tutor-add-block").addEventListener("click", () => {
     $("#tutor-block-form").reset();
+    updateEndOptions();
     $("#tutor-block-date").value = dateISO(weekStart);
     $("#tutor-block-error").textContent = "";
     $("#tutor-block-dialog").showModal();

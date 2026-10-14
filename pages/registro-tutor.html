@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Solicitud de tutor — TutoresOn-Line</title>
+  <link rel="icon" type="image/webp" href="../images/logo.webp">
   <link rel="stylesheet" href="../css/base.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/auth.css">
@@ -261,7 +262,7 @@
             <input type="file" id="hoja-vida" name="hoja-vida"
               accept="application/pdf" aria-describedby="hoja-vida-help" required>
             <small id="hoja-vida-help" class="auth-form-note">
-              En esta maqueta el archivo no se sube ni se guarda.
+              Solo PDF, máximo 700 KB. Únicamente el equipo administrador podrá verlo.
             </small>
           </div>
         </fieldset>
@@ -273,7 +274,7 @@
 
         <button type="submit" id="btn-enviar-solicitud"
           class="button button-primary button-full"
-          aria-describedby="tutor-demo-note">
+          aria-describedby="tutor-form-note">
           <span>Enviar solicitud</span>
           <svg class="icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <use href="#icon-arrow-right"></use>
@@ -281,8 +282,8 @@
         </button>
 
         <!-- ESTE ELEMENTO ES OBLIGATORIO: registro-tutor.js lo busca al arrancar -->
-        <p id="tutor-demo-note" class="auth-form-note">
-          Vista de demostración: no se guardan datos ni se envían solicitudes.
+        <p id="tutor-form-note" class="auth-form-note">
+          Tu solicitud será revisada por el equipo administrador antes de activar tu perfil.
         </p>
 
       </form>

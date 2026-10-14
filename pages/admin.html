@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Panel del administrador de TutoresOn-Line">
   <title>Resumen | TutoresOn-Line</title>
+  <link rel="icon" type="image/webp" href="../images/logo.webp">
 
   <link rel="stylesheet" href="../css/base.css">
   <link rel="stylesheet" href="../css/components.css">
@@ -157,7 +158,7 @@
         </a>
         <a href="#materias">
           <svg class="icon" aria-hidden="true"><use href="#icon-book"></use></svg>
-          <span>Materias y niveles</span>
+          <span>Materias</span>
         </a>
         <a href="#tutorias">
           <svg class="icon" aria-hidden="true"><use href="#icon-video"></use></svg>
@@ -261,10 +262,6 @@
       <main class="dashboard-main" id="contenido-principal">
         <!-- Resumen -->
         <section id="resumen" aria-labelledby="admin-home-title">
-          <p class="demo-notice">
-            Demostración: los datos y las fechas son de ejemplo. Las acciones administrativas se simulan y los permisos reales se aplicarán al conectar Firebase.
-          </p>
-
           <div class="admin-page-heading">
             <div>
               <p class="admin-eyebrow">Panel de administración</p>
@@ -285,7 +282,7 @@
               <div>
                 <p class="admin-label">Usuarios totales</p>
                 <strong id="admin-stat-users">0</strong>
-                <small>Cuentas registradas de ejemplo</small>
+                <small id="admin-stat-users-note">Cuentas registradas</small>
               </div>
             </article>
 
@@ -307,7 +304,7 @@
               <div>
                 <p class="admin-label">Materias activas</p>
                 <strong id="admin-stat-materias">0</strong>
-                <small>En el catálogo de demostración</small>
+                <small>Catálogo de la plataforma</small>
               </div>
             </article>
 
@@ -322,6 +319,17 @@
               </div>
             </article>
           </div>
+
+          <section class="admin-surface admin-analytics" aria-labelledby="analytics-title">
+            <div class="admin-section-heading">
+              <div>
+                <p class="admin-eyebrow">Datos reales</p>
+                <h2 id="analytics-title">Estadísticas de la plataforma</h2>
+              </div>
+              <button class="btn btn-secondary" type="button" id="admin-analytics-refresh">Actualizar</button>
+            </div>
+            <div id="admin-analytics-body" aria-live="polite"></div>
+          </section>
 
           <div class="admin-home-grid">
             <section class="admin-surface" aria-labelledby="pending-title">
@@ -369,7 +377,7 @@
               </a>
               <a href="#materias">
                 <svg class="icon" aria-hidden="true"><use href="#icon-book"></use></svg>
-                <span>Materias y niveles</span>
+                <span>Materias</span>
                 <small>Catálogo académico</small>
               </a>
               <a href="#calificaciones">
@@ -400,7 +408,7 @@
               <span>Rol</span>
               <select id="admin-user-role">
                 <option value="all">Todos</option>
-                <option value="student">Estudiantes</option>
+                <option value="estudiante">Estudiantes</option>
                 <option value="tutor">Tutores</option>
                 <option value="admin">Administradores</option>
               </select>
@@ -435,8 +443,8 @@
             <button type="button" data-tutor-status="verified" aria-pressed="false">
               Verificados <span data-tutor-count="verified"></span>
             </button>
-            <button type="button" data-tutor-status="suspended" aria-pressed="false">
-              Suspendidos <span data-tutor-count="suspended"></span>
+            <button type="button" data-tutor-status="rejected" aria-pressed="false">
+              Rechazados <span data-tutor-count="rejected"></span>
             </button>
           </div>
 
@@ -456,18 +464,14 @@
           <div class="admin-tutor-grid" id="admin-tutor-grid"></div>
         </section>
 
-        <!-- Materias y niveles -->
+        <!-- Materias -->
         <section id="materias" aria-labelledby="subjects-title" hidden>
           <div class="admin-page-heading">
             <div>
               <p class="admin-eyebrow">Catálogo académico</p>
-              <h1 id="subjects-title">Materias y niveles</h1>
-              <p>Organiza las materias del catálogo y sus unidades por nivel.</p>
+              <h1 id="subjects-title">Materias</h1>
+              <p>Catálogo de la plataforma con sus tutores, tutorías y calificaciones.</p>
             </div>
-            <button class="btn btn-primary" id="admin-add-subject" type="button">
-              <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
-              Agregar materia
-            </button>
           </div>
 
           <div class="admin-subject-layout">
@@ -487,12 +491,9 @@
                 </div>
               </div>
               <p class="admin-muted" id="admin-subject-detail-intro">
-                Elige una materia de la lista para ver sus unidades por nivel.
+                Elige una materia de la lista para ver sus tutores y estadísticas.
               </p>
               <div class="admin-subject-units" id="admin-subject-units" hidden></div>
-              <div class="admin-subject-actions" id="admin-subject-actions" hidden>
-                <button class="btn btn-secondary" id="admin-subject-toggle" type="button"></button>
-              </div>
             </div>
           </div>
         </section>
@@ -773,44 +774,6 @@
   </dialog>
 
   <!-- Formulario para agregar materia -->
-  <dialog class="admin-dialog" id="admin-subject-dialog" aria-labelledby="admin-subject-dialog-title">
-    <form id="admin-subject-form">
-      <div class="admin-section-heading">
-        <h2 id="admin-subject-dialog-title">Agregar materia</h2>
-        <button class="admin-icon-button" type="button" data-close-dialog aria-label="Cerrar">
-          <svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg>
-        </button>
-      </div>
-
-      <div class="admin-dialog-fields">
-        <label class="admin-field admin-field-full">
-          <span>Nombre de la materia</span>
-          <input id="admin-subject-name" type="text" maxlength="80" required placeholder="Ej.: Cálculo integral">
-        </label>
-        <label class="admin-field">
-          <span>Nivel inicial</span>
-          <select id="admin-subject-level">
-            <option>Primaria</option>
-            <option>Secundaria</option>
-            <option>Universidad</option>
-            <option>Posgrado</option>
-          </select>
-        </label>
-        <label class="admin-field">
-          <span>Estado</span>
-          <select id="admin-subject-status">
-            <option value="active">Activa</option>
-            <option value="inactive">Inactiva</option>
-          </select>
-        </label>
-      </div>
-
-      <p class="admin-form-error" id="admin-subject-error" role="alert"></p>
-      <button class="btn btn-primary" type="submit" style="width: 100%;">Agregar a la demostración</button>
-    </form>
-  </dialog>
-
-  <!-- Editar calificación -->
   <dialog class="admin-dialog" id="admin-rating-dialog" aria-labelledby="admin-rating-dialog-title">
     <form id="admin-rating-form">
       <div class="admin-section-heading">

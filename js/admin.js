@@ -1,7 +1,12 @@
 /* js/admin.js — Panel del administrador
    Navegación por #. Conectado a Firestore: Mi perfil, Calificaciones y
    Tutorías (casos de soporte = colección «mensajesSoporte»).
-   Siguen con datos de ejemplo: Resumen, Usuarios, Tutores y Materias.
+   Tutores (solicitudes + hoja de vida, aprobar/rechazar) y el contador de
+   pendientes del Resumen también son reales (colección «usuarios»,
+   rol = tutor, y «hojasDeVida»).
+   Estadísticas del Resumen (tutorías, solicitudes, calificaciones, usuarios) reales.
+   Usuarios, Materias, Actividad reciente y Notificaciones también son reales
+   (se arman con usuarios, tutorías, calificaciones y mensajes de soporte).
    Seguridad (contraseña) la maneja js/configuracion.js.
    Se carga como módulo: <script type="module" src="../js/admin.js"></script> */
 
@@ -12,6 +17,8 @@ import {
   updateDoc,
   collection,
   getDocs,
+  query,
+  where,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
@@ -55,173 +62,61 @@ function detalleError(err) {
     : "Revisa tu conexión e inténtalo de nuevo.";
 }
 
+/* ---------- Catálogo de materias ----------
+   Mismas materias que las casillas de registro-tutor.html. En los tutores se
+   guardan como «slug» (matematicas) y en las tutorías como texto (Matemáticas),
+   así que todo se compara normalizado. */
+const MATERIAS = [
+  { id: "matematicas", nombre: "Matemáticas" },
+  { id: "fisica", nombre: "Física" },
+  { id: "quimica", nombre: "Química" },
+  { id: "programacion", nombre: "Programación" },
+  { id: "idiomas", nombre: "Idiomas" },
+  { id: "estadistica", nombre: "Estadística" }
+];
+
+function normMateria(valor) {
+  return String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+}
+
+function materiaId(valor) {
+  const n = normMateria(valor);
+  if (n === "estadisticas") return "estadistica";
+  return MATERIAS.find((m) => m.id === n || normMateria(m.nombre) === n)?.id || n;
+}
+
+function materiaNombre(valor) {
+  const id = materiaId(valor);
+  return MATERIAS.find((m) => m.id === id)?.nombre || String(valor || "").trim() || "Sin materia";
+}
+
+function fechaDe(valor) {
+  const f = typeof valor?.toDate === "function" ? valor.toDate() : null;
+  return f && !Number.isNaN(f.getTime()) ? f : null;
+}
+
+function tiempoRelativo(fecha) {
+  const min = Math.floor((Date.now() - fecha.getTime()) / 60000);
+  if (min < 1) return "Hace un momento";
+  if (min < 60) return `Hace ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `Hace ${h} ${h === 1 ? "hora" : "horas"}`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `Hace ${d} ${d === 1 ? "día" : "días"}`;
+  return fecha.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
+}
+
 const ADMIN_SECTIONS = [
   { id: "resumen", label: "Resumen" },
   { id: "usuarios", label: "Usuarios" },
   { id: "tutores", label: "Tutores" },
-  { id: "materias", label: "Materias y niveles" },
+  { id: "materias", label: "Materias" },
   { id: "tutorias", label: "Tutorías" },
   { id: "calificaciones", label: "Calificaciones" },
   { id: "notificaciones", label: "Notificaciones" },
   { id: "perfil", label: "Mi perfil" },
   { id: "seguridad", label: "Configuración" },
   { id: "ayuda", label: "Centro de ayuda" }
-];
-
-/* ---------- Datos de demostración ---------- */
-const demoUsers = [
-  { id: 1, name: "María Rodríguez", email: "maria@correo.com", role: "tutor", status: "active", initial: "MR" },
-  { id: 2, name: "Sofía Pérez", email: "sofia@correo.com", role: "student", status: "active", initial: "SP" },
-  { id: 3, name: "Andrés López", email: "andres@correo.com", role: "student", status: "active", initial: "AL" },
-  { id: 4, name: "Carlos Gómez", email: "carlos@correo.com", role: "tutor", status: "suspended", initial: "CG" },
-  { id: 5, name: "Valentina Ríos", email: "valentina@correo.com", role: "student", status: "active", initial: "VR" },
-  { id: 6, name: "Diego Ávila", email: "diego@correo.com", role: "student", status: "active", initial: "DA" },
-  { id: 7, name: "Laura Cárdenas", email: "laura@correo.com", role: "admin", status: "active", initial: "LC" },
-  { id: 8, name: "Julián Méndez", email: "julian@correo.com", role: "tutor", status: "active", initial: "JM" },
-  { id: 9, name: "Camila Torres", email: "camila@correo.com", role: "student", status: "suspended", initial: "CT" }
-];
-
-const demoTutors = [
-  {
-    id: 1,
-    name: "María Rodríguez",
-    email: "maria@correo.com",
-    subject: "Cálculo integral",
-    status: "verified",
-    rating: "4.9",
-    reviews: 38,
-    initial: "MR",
-    bio: "Matemática con 5 años de experiencia en nivel universitario."
-  },
-  {
-    id: 4,
-    name: "Carlos Gómez",
-    email: "carlos@correo.com",
-    subject: "Física mecánica",
-    status: "suspended",
-    rating: "4.2",
-    reviews: 11,
-    initial: "CG",
-    bio: "Físico, enfocado en ejercicios y problemas de aplicación."
-  },
-  {
-    id: 8,
-    name: "Julián Méndez",
-    email: "julian@correo.com",
-    subject: "Álgebra lineal",
-    status: "verified",
-    rating: "4.8",
-    reviews: 24,
-    initial: "JM",
-    bio: "Ingeniero con experiencia docente en primeros semestres."
-  },
-  {
-    id: 10,
-    name: "Paola Duarte",
-    email: "paola@correo.com",
-    subject: "Inglés B1",
-    status: "pending",
-    rating: "—",
-    reviews: 0,
-    initial: "PD",
-    bio: "Licenciada en lenguas modernas, certificación B2."
-  },
-  {
-    id: 11,
-    name: "Óscar Herrera",
-    email: "oscar@correo.com",
-    subject: "Química general",
-    status: "pending",
-    rating: "—",
-    reviews: 0,
-    initial: "OH",
-    bio: "Químico con experiencia en laboratorios universitarios."
-  },
-  {
-    id: 12,
-    name: "Natalia Suárez",
-    email: "natalia@correo.com",
-    subject: "Lectoescritura",
-    status: "pending",
-    rating: "—",
-    reviews: 0,
-    initial: "NS",
-    bio: "Docente de primaria con 8 años de trayectoria."
-  }
-];
-
-const demoSubjects = [
-  {
-    id: 1,
-    name: "Cálculo integral",
-    level: "Universidad",
-    status: "active",
-    units: [
-      { name: "Integrales indefinidas", detail: "Métodos de integración y sus aplicaciones." },
-      { name: "Integrales definidas", detail: "Teorema fundamental del cálculo." },
-      { name: "Aplicaciones", detail: "Áreas, volúmenes y problemas de contexto." }
-    ]
-  },
-  {
-    id: 2,
-    name: "Álgebra lineal",
-    level: "Universidad",
-    status: "active",
-    units: [
-      { name: "Sistemas de ecuaciones", detail: "Métodos de eliminación y matrices." },
-      { name: "Espacios vectoriales", detail: "Bases, dimensión y transformaciones." }
-    ]
-  },
-  {
-    id: 3,
-    name: "Física mecánica",
-    level: "Universidad",
-    status: "active",
-    units: [
-      { name: "Cinemática", detail: "Movimiento en una y dos dimensiones." },
-      { name: "Dinámica", detail: "Leyes de Newton y fuerzas." }
-    ]
-  },
-  {
-    id: 4,
-    name: "Inglés B1",
-    level: "Secundaria",
-    status: "active",
-    units: [
-      { name: "Presente y pasado", detail: "Tiempos verbales básicos." },
-      { name: "Conversación", detail: "Situaciones cotidianas y vocabulario." }
-    ]
-  },
-  {
-    id: 5,
-    name: "Química general",
-    level: "Universidad",
-    status: "active",
-    units: [
-      { name: "Estructura atómica", detail: "Modelos atómicos y periodicidad." },
-      { name: "Enlaces químicos", detail: "Tipos de enlace y propiedades." }
-    ]
-  },
-  {
-    id: 6,
-    name: "Lectoescritura",
-    level: "Primaria",
-    status: "active",
-    units: [
-      { name: "Comprensión lectora", detail: "Ideas principales e inferencias." },
-      { name: "Producción de texto", detail: "Escritura de párrafos sencillos." }
-    ]
-  },
-  {
-    id: 7,
-    name: "Estadística descriptiva",
-    level: "Universidad",
-    status: "inactive",
-    units: [
-      { name: "Medidas de tendencia", detail: "Media, mediana y moda." },
-      { name: "Gráficos", detail: "Histogramas y diagramas de caja." }
-    ]
-  }
 ];
 
 /* Datos reales (Firestore) */
@@ -234,24 +129,19 @@ let cases = [];              // colección «mensajesSoporte»
 let casesEstado = "cargando";
 let casesError = null;
 let editingRatingId = null;
-
-const demoNotifications = [
-  { id: 1, title: "Nueva solicitud de tutor", detail: "Paola Duarte envió su solicitud de verificación.", time: "Hace 2 horas" },
-  { id: 2, title: "Reporte de sesión", detail: "Diego Ávila reportó un problema con el enlace.", time: "Hace 5 horas" },
-  { id: 3, title: "Comentario por revisar", detail: "Hay una calificación pendiente de moderación.", time: "Hace 1 día" },
-  { id: 4, title: "Tutor suspendido", detail: "Carlos Gómez fue suspendido temporalmente.", time: "Hace 3 días" }
-];
-
-const demoActivity = [
-  { icon: "users", title: "Se registró la cuenta de Camila Torres", detail: "Hace 40 minutos" },
-  { icon: "award", title: "Paola Duarte solicitó verificación", detail: "Hace 2 horas" },
-  { icon: "star", title: "Nueva calificación para Cálculo integral", detail: "Hace 5 horas" },
-  { icon: "flag", title: "Caso de soporte abierto: pago duplicado", detail: "Hace 8 horas" }
-];
+let tutors = [];             // usuarios con rol «tutor» que ya enviaron solicitud
+let tutorsEstado = "cargando";
+let tutorsError = null;
+const tutorsGuardando = new Set(); // evita doble clic mientras se guarda
+let statsTutorias = [];      // colección «tutorias» (todas)
+let statsSolicitudes = [];   // colección «solicitudes» (todas)
+let statsUsuarios = [];      // colección «usuarios» (todos)
+let statsEstado = "cargando";
+let statsError = null;
 
 /* ---------- Estado de la interfaz ---------- */
 let currentSection = "resumen";
-let tutorTab = "pending";
+let tutorTab = "pending"; // pending | verified | rejected
 let caseTab = "open";
 let activeSubjectId = null;
 
@@ -319,34 +209,47 @@ function showToast(message) {
 
 /* ---------- Renderizado: Resumen ---------- */
 function renderStats() {
-  const tutorsVerified = demoUsers.filter((u) => u.role === "tutor" && u.status === "active").length;
-  const pendingTutors = demoTutors.filter((t) => t.status === "pending").length;
+  const tutorsVerified = tutors.filter((t) => t.status === "verified").length;
+  const pendingTutors = tutors.filter((t) => t.status === "pending").length;
 
-  $("#admin-stat-users").textContent = demoUsers.length;
+  if (statsEstado === "listo") {
+    const estudiantes = statsUsuarios.filter((u) => u.rol === "estudiante").length;
+    $("#admin-stat-users").textContent = statsUsuarios.length;
+    $("#admin-stat-users-note").textContent = `${estudiantes} estudiantes · ${statsUsuarios.length - estudiantes} tutores y admins`;
+  } else {
+    $("#admin-stat-users").textContent = "…";
+  }
   $("#admin-stat-tutors").textContent = tutorsVerified;
-  $("#admin-stat-materias").textContent = demoSubjects.length;
+  $("#admin-stat-materias").textContent = MATERIAS.length;
   const openCases = cases.filter((c) => caseStatus(c) === "open").length;
   $("#admin-stat-pending").textContent = pendingTutors + openCases;
 }
 
 function renderPendingList() {
   const container = $("#admin-pending-list");
-  const total = demoTutors.filter((t) => t.status === "pending").length;
+  const pendientes = tutors.filter((t) => t.status === "pending");
 
-  if (total === 0) {
+  if (tutorsEstado === "cargando") {
+    container.innerHTML = '<p class="admin-empty">Cargando solicitudes…</p>';
+    return;
+  }
+  if (tutorsEstado === "error") {
+    container.innerHTML = `<p class="admin-empty">No se pudieron cargar las solicitudes. ${escapeHTML(detalleError(tutorsError))}</p>`;
+    return;
+  }
+  if (pendientes.length === 0) {
     container.innerHTML = '<p class="admin-empty">No hay pendientes por revisar.</p>';
     return;
   }
 
-  container.innerHTML = demoTutors
-    .filter((t) => t.status === "pending")
+  container.innerHTML = pendientes
     .map(
       (t) => `
       <div class="admin-pending-item">
         <svg class="icon" aria-hidden="true"><use href="#icon-award"></use></svg>
         <div>
-          <strong>Solicitud de ${t.name}</strong>
-          <p>Verificación como tutor de ${t.subject}</p>
+          <strong>Solicitud de ${escapeHTML(t.name)}</strong>
+          <p>Verificación como tutor de ${escapeHTML(t.subject || "sin materia")}</p>
         </div>
         <span class="admin-status pending">Pendiente</span>
       </div>
@@ -356,14 +259,49 @@ function renderPendingList() {
 }
 
 function renderActivity() {
-  $("#admin-activity-list").innerHTML = demoActivity
+  const box = $("#admin-activity-list");
+  const eventos = [];
+  const add = (icon, title, ts) => {
+    const fecha = fechaDe(ts);
+    if (fecha) eventos.push({ icon, title, fecha });
+  };
+
+  statsUsuarios.forEach((u) => {
+    const v = userView(u);
+    add("users", `Se registró ${v.name} (${(ROLE_LABELS[v.rol] || "usuario").toLowerCase()})`, u.creadoEn);
+  });
+  tutors.forEach((t) => {
+    add("award", `${t.name} solicitó verificación como tutor`, t.solicitudEnviadaEn);
+    if (t.revisadoEn) {
+      add("check", `Solicitud de ${t.name} ${t.status === "rejected" ? "rechazada" : "aprobada"}`, t.revisadoEn);
+    }
+  });
+  statsTutorias.forEach((t) => {
+    add("calendar", `Tutoría de ${materiaNombre(t.materia)} programada: ${t.tutorNombre || "tutor"} con ${t.estudianteNombre || "estudiante"}`, t.creadaEn || t.creadoEn);
+  });
+  ratings.forEach((r) => {
+    add("star", `Nueva calificación de ${Number(r.estrellas) || 0}★ para ${r.tutorNombre || "un tutor"}`, r.creadaEn);
+  });
+  cases.forEach((c) => {
+    add("flag", `Caso de soporte: ${c.asunto || "sin asunto"}`, c.creadoEn);
+  });
+
+  eventos.sort((a, b) => b.fecha - a.fecha);
+
+  if (eventos.length === 0) {
+    box.innerHTML = `<p class="admin-empty">${statsEstado === "cargando" ? "Cargando actividad…" : "Todavía no hay actividad."}</p>`;
+    return;
+  }
+
+  box.innerHTML = eventos
+    .slice(0, 8)
     .map(
-      (a) => `
+      (e) => `
       <div class="admin-activity-item">
-        <svg class="icon" aria-hidden="true"><use href="#icon-${a.icon}"></use></svg>
+        <svg class="icon" aria-hidden="true"><use href="#icon-${e.icon}"></use></svg>
         <div>
-          <strong>${a.title}</strong>
-          <p>${a.detail}</p>
+          <strong>${escapeHTML(e.title)}</strong>
+          <p>${escapeHTML(tiempoRelativo(e.fecha))}</p>
         </div>
       </div>
     `
@@ -378,13 +316,24 @@ function renderUsers() {
   const status = $("#admin-user-status").value;
   const grid = $("#admin-user-grid");
 
-  const roles = { student: "Estudiante", tutor: "Tutor", admin: "Administrador" };
-  const filtered = demoUsers.filter((u) => {
-    const matchSearch = !search || u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search);
-    const matchRole = role === "all" || u.role === role;
-    const matchStatus = status === "all" || u.status === status;
-    return matchSearch && matchRole && matchStatus;
-  });
+  if (statsEstado === "cargando") {
+    grid.innerHTML = '<p class="admin-empty">Cargando usuarios…</p>';
+    return;
+  }
+  if (statsEstado === "error") {
+    grid.innerHTML = `<p class="admin-empty">No se pudieron cargar los usuarios. ${escapeHTML(detalleError(statsError))}</p>`;
+    return;
+  }
+
+  const filtered = statsUsuarios
+    .map(userView)
+    .filter((u) => {
+      const matchSearch = !search || u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search);
+      const matchRole = role === "all" || u.rol === role;
+      const matchStatus = status === "all" || u.status === status;
+      return matchSearch && matchRole && matchStatus;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "es"));
 
   if (filtered.length === 0) {
     grid.innerHTML = '<p class="admin-empty">No se encontraron usuarios con esos filtros.</p>';
@@ -394,15 +343,15 @@ function renderUsers() {
   grid.innerHTML = filtered
     .map(
       (u) => `
-      <button class="admin-user-card" type="button" data-user-id="${u.id}">
+      <button class="admin-user-card" type="button" data-user-id="${escapeHTML(u.id)}">
         <div class="admin-user-card-top">
-          <span class="admin-initials">${u.initial}</span>
+          <span class="admin-initials">${escapeHTML(u.initial)}</span>
           <div>
-            <strong>${u.name}</strong>
-            <small>${u.email}</small>
+            <strong>${escapeHTML(u.name)}</strong>
+            <small>${escapeHTML(u.email)}</small>
           </div>
         </div>
-        <p>${roles[u.role]} · <span class="admin-status ${u.status}">${u.status === "active" ? "Activo" : "Suspendido"}</span></p>
+        <p>${escapeHTML(ROLE_LABELS[u.rol] || u.rol || "Sin rol")} · <span class="admin-status ${u.status}">${u.status === "active" ? "Activo" : "Suspendido"}</span></p>
       </button>
     `
     )
@@ -413,49 +362,303 @@ function renderUsers() {
   });
 }
 
-function openUserDetail(userId) {
-  const user = demoUsers.find((u) => String(u.id) === String(userId));
-  if (!user) return;
+// Una cuenta está activa salvo que «activo» sea false (el registro lo crea en true).
+function userView(u) {
+  const name = `${u.nombre || ""} ${u.apellido || ""}`.trim() || u.email || "Sin nombre";
+  return {
+    ...u,
+    name,
+    email: u.email || "",
+    initial: iniciales(name, "US"),
+    status: u.activo === false ? "suspended" : "active"
+  };
+}
 
-  const roles = { student: "Estudiante", tutor: "Tutor", admin: "Administrador" };
+async function setUserActive(uid, activo) {
+  try {
+    await updateDoc(doc(db, "usuarios", uid), { activo });
+    const u = statsUsuarios.find((x) => x.id === uid);
+    if (u) u.activo = activo;
+    $("#admin-user-dialog").close();
+    renderUsers();
+    renderStats();
+    showToast(`La cuenta quedó ${activo ? "activada" : "suspendida"}.`);
+  } catch (err) {
+    console.error("No se pudo cambiar el estado de la cuenta:", err);
+    showToast(`No se pudo guardar el cambio. ${detalleError(err)}`);
+  }
+}
+
+function openUserDetail(userId) {
+  const raw = statsUsuarios.find((u) => u.id === userId);
+  if (!raw) return;
+  const user = userView(raw);
+
   const dialog = $("#admin-user-dialog");
   const statusLabel = user.status === "active" ? "Activo" : "Suspendido";
+  // No se permite suspender a un administrador (ni a uno mismo).
+  const puedeSuspender = user.rol !== "admin" && user.id !== adminUid;
+  const solicitud = user.rol === "tutor" && tutorStatusFromEstado(user.estado)
+    ? `<dt>Solicitud de tutor</dt><dd>${escapeHTML(TUTOR_STATUS_LABELS[tutorStatusFromEstado(user.estado)])}</dd>`
+    : user.rol === "tutor"
+      ? "<dt>Solicitud de tutor</dt><dd>Sin enviar (perfil incompleto)</dd>"
+      : "";
 
   $("#admin-user-detail").innerHTML = `
     <dl class="admin-detail-list">
-      <dt>Nombre</dt><dd>${user.name}</dd>
-      <dt>Correo</dt><dd>${user.email}</dd>
-      <dt>Rol</dt><dd>${roles[user.role]}</dd>
+      <dt>Nombre</dt><dd>${escapeHTML(user.name)}</dd>
+      <dt>Correo</dt><dd>${escapeHTML(user.email)}</dd>
+      <dt>Rol</dt><dd>${escapeHTML(ROLE_LABELS[user.rol] || user.rol || "Sin rol")}</dd>
+      ${solicitud}
       <dt>Estado</dt><dd><span class="admin-status ${user.status}">${statusLabel}</span></dd>
+      <dt>Registro</dt><dd>${escapeHTML(fechaCorta(user.creadoEn) || "—")}</dd>
+      <dt>ID</dt><dd>${escapeHTML(user.id)}</dd>
     </dl>
+    ${puedeSuspender ? `
     <div class="admin-detail-actions">
       <button class="btn btn-secondary" type="button" data-user-toggle>${user.status === "active" ? "Suspender cuenta" : "Activar cuenta"}</button>
-    </div>
+    </div>` : ""}
   `;
 
-  const toggleBtn = $("#admin-user-detail [data-user-toggle]");
-  toggleBtn.addEventListener("click", () => {
-    const newStatus = user.status === "active" ? "suspended" : "active";
-    user.status = newStatus;
-    dialog.close();
-    renderUsers();
-    renderStats();
-    showToast(`La cuenta de ${user.name} quedó ${newStatus === "active" ? "activada" : "suspendida"} (demostración).`);
-  });
+  $("#admin-user-detail [data-user-toggle]")?.addEventListener("click", () =>
+    setUserActive(user.id, user.status !== "active")
+  );
 
   dialog.showModal();
 }
 
 /* ---------- Renderizado: Tutores ---------- */
+/* ---------- Estadísticas (Firestore: tutorias, solicitudes, usuarios, calificaciones) ---------- */
+async function loadStats() {
+  statsEstado = "cargando";
+  renderAnalytics();
+  try {
+    const [tut, sol, usu] = await Promise.all([
+      getDocs(collection(db, "tutorias")),
+      getDocs(collection(db, "solicitudes")),
+      getDocs(collection(db, "usuarios"))
+    ]);
+    statsTutorias = tut.docs.map((d) => ({ id: d.id, ...d.data() }));
+    statsSolicitudes = sol.docs.map((d) => ({ id: d.id, ...d.data() }));
+    statsUsuarios = usu.docs.map((d) => ({ id: d.id, ...d.data() }));
+    statsEstado = "listo";
+  } catch (err) {
+    console.error("No se pudieron cargar las estadísticas:", err);
+    statsEstado = "error";
+    statsError = err;
+  }
+  renderAnalytics();
+  renderUsers();
+  renderStats();
+  renderSubjectList();
+  renderActivity();
+}
+
+function barRow(etiqueta, valor, maximo, texto, clase = "") {
+  const ancho = maximo > 0 ? Math.round((valor / maximo) * 100) : 0;
+  return `
+    <div class="admin-bar-row">
+      <span title="${escapeHTML(etiqueta)}">${escapeHTML(etiqueta)}</span>
+      <span class="admin-bar-track"><span class="admin-bar-fill ${clase}" style="width:${ancho}%"></span></span>
+      <span>${escapeHTML(texto)}</span>
+    </div>`;
+}
+
+function renderAnalytics() {
+  const body = $("#admin-analytics-body");
+  if (!body) return;
+
+  if (statsEstado === "cargando") {
+    body.innerHTML = '<p class="admin-empty">Cargando estadísticas…</p>';
+    return;
+  }
+  if (statsEstado === "error") {
+    body.innerHTML = `<p class="admin-empty">No se pudieron cargar las estadísticas. ${escapeHTML(detalleError(statsError))}</p>`;
+    return;
+  }
+
+  const total = statsTutorias.length;
+  const porEstado = (e) => statsTutorias.filter((t) => t.estado === e).length;
+  const completadas = porEstado("completada");
+  const programadas = porEstado("programada");
+  const canceladas = porEstado("cancelada");
+  const pct = (n, d) => (d > 0 ? `${Math.round((n / d) * 100)} %` : "—");
+
+  const solTotal = statsSolicitudes.length;
+  const solPend = statsSolicitudes.filter((s) => s.estado === "pendiente").length;
+  const solAcep = statsSolicitudes.filter((s) => s.estado === "aceptada").length;
+  const solResueltas = solAcep + statsSolicitudes.filter((s) => s.estado === "rechazada").length;
+
+  const visibles = ratings.filter((r) => r.estado === "visible");
+  const ocultas = ratings.length - visibles.length;
+  const promedio = visibles.length
+    ? (visibles.reduce((a, r) => a + (Number(r.estrellas) || 0), 0) / visibles.length).toFixed(1)
+    : null;
+
+  // Tutorías por materia (top 6)
+  const porMateria = {};
+  statsTutorias.forEach((t) => {
+    const m = materiaNombre(t.materia);
+    porMateria[m] = porMateria[m] || { total: 0, completadas: 0 };
+    porMateria[m].total += 1;
+    if (t.estado === "completada") porMateria[m].completadas += 1;
+  });
+  const materias = Object.entries(porMateria).sort((a, b) => b[1].total - a[1].total).slice(0, 6);
+  const maxMateria = materias[0]?.[1].total || 0;
+
+  // Tutores con más tutorías completadas (top 5), con su promedio
+  const porTutor = {};
+  statsTutorias.forEach((t) => {
+    if (!t.tutorId) return;
+    porTutor[t.tutorId] = porTutor[t.tutorId] || { nombre: t.tutorNombre || "Tutor", total: 0, completadas: 0 };
+    porTutor[t.tutorId].total += 1;
+    if (t.estado === "completada") porTutor[t.tutorId].completadas += 1;
+  });
+  const topTutores = Object.entries(porTutor)
+    .sort((a, b) => b[1].completadas - a[1].completadas || b[1].total - a[1].total)
+    .slice(0, 5);
+  const maxTutor = topTutores[0]?.[1].completadas || 0;
+
+  // Distribución de estrellas
+  const dist = [5, 4, 3, 2, 1].map((n) => ({ n, c: visibles.filter((r) => Number(r.estrellas) === n).length }));
+  const maxDist = Math.max(0, ...dist.map((d) => d.c));
+
+  const vacio = '<p class="admin-muted">Todavía no hay datos.</p>';
+
+  body.innerHTML = `
+    <div class="admin-kpis">
+      <div class="admin-kpi"><span>Tutorías totales</span><strong>${total}</strong><small>${programadas} programadas</small></div>
+      <div class="admin-kpi"><span>Completadas</span><strong>${completadas}</strong><small>${pct(completadas, total)} del total</small></div>
+      <div class="admin-kpi"><span>Canceladas</span><strong>${canceladas}</strong><small>${pct(canceladas, total)} del total</small></div>
+      <div class="admin-kpi"><span>Calificación promedio</span><strong>${promedio ? `${promedio} ★` : "—"}</strong><small>${visibles.length} visibles${ocultas ? ` · ${ocultas} ocultas` : ""}</small></div>
+      <div class="admin-kpi"><span>Solicitudes</span><strong>${solTotal}</strong><small>${solPend} pendientes</small></div>
+      <div class="admin-kpi"><span>Tasa de aceptación</span><strong>${pct(solAcep, solResueltas)}</strong><small>de las solicitudes resueltas</small></div>
+      <div class="admin-kpi"><span>Estudiantes</span><strong>${statsUsuarios.filter((u) => u.rol === "estudiante").length}</strong><small>cuentas registradas</small></div>
+      <div class="admin-kpi"><span>Tutores aprobados</span><strong>${tutors.filter((t) => t.status === "verified").length}</strong><small>${tutors.filter((t) => t.status === "pending").length} por revisar</small></div>
+    </div>
+    <div class="admin-charts">
+      <div class="admin-chart">
+        <h3>Tutorías por materia</h3>
+        ${materias.length ? materias.map(([m, v]) => barRow(m, v.total, maxMateria, `${v.completadas}/${v.total}`)).join("") : vacio}
+        ${materias.length ? '<p class="admin-muted">Completadas / total</p>' : ""}
+      </div>
+      <div class="admin-chart">
+        <h3>Tutores con más tutorías completadas</h3>
+        ${topTutores.length ? topTutores.map(([id, v]) => {
+          const r = tutorRating(id);
+          return barRow(v.nombre, v.completadas, maxTutor, `${v.completadas}${r.total ? ` · ${r.promedio}★` : ""}`, "is-green");
+        }).join("") : vacio}
+      </div>
+      <div class="admin-chart">
+        <h3>Distribución de calificaciones</h3>
+        ${visibles.length ? dist.map((d) => barRow(`${d.n} ★`, d.c, maxDist, String(d.c))).join("") : vacio}
+      </div>
+    </div>`;
+}
+
+/* ---------- Tutores (Firestore: usuarios con rol «tutor») ----------
+   Ciclo de vida del campo «estado»: incompleto → pendiente → aprobado | rechazado.
+   «incompleto» (aún no envió el formulario) no aparece en el panel. */
+const TUTOR_STATUS_MAP = {
+  pendiente: "pending",
+  aprobado: "verified",
+  aceptado: "verified",
+  rechazado: "rejected",
+  rechazada: "rejected"
+};
+const TUTOR_STATUS_LABELS = { pending: "Pendiente", verified: "Aprobado", rejected: "Rechazado" };
+
+function tutorStatusFromEstado(estado) {
+  return TUTOR_STATUS_MAP[String(estado || "").trim().toLowerCase()] || null;
+}
+
+function tutorRating(tutorId) {
+  const visibles = ratings.filter((r) => r.tutorId === tutorId && r.estado === "visible");
+  if (visibles.length === 0) return { promedio: null, total: 0 };
+  const suma = visibles.reduce((acc, r) => acc + (Number(r.estrellas) || 0), 0);
+  return { promedio: (suma / visibles.length).toFixed(1), total: visibles.length };
+}
+
+async function loadTutors() {
+  tutorsEstado = "cargando";
+  renderTutors();
+  renderPendingList();
+  try {
+    const snap = await getDocs(query(collection(db, "usuarios"), where("rol", "==", "tutor")));
+    tutors = snap.docs
+      .map((d) => {
+        const x = d.data();
+        const materias = Array.isArray(x.materias) ? x.materias : [];
+        const name = `${x.nombre || ""} ${x.apellido || ""}`.trim() || x.email || "Tutor";
+        return {
+          id: d.id,
+          ...x,
+          materias,
+          name,
+          email: x.email || "",
+          subject: materias.map(materiaNombre).join(", "),
+          initial: iniciales(name, "TU"),
+          status: tutorStatusFromEstado(x.estado)
+        };
+      })
+      .filter((t) => t.status) // «incompleto» todavía no es una solicitud
+      .sort((a, b) => (b.solicitudEnviadaEn?.toMillis?.() ?? 0) - (a.solicitudEnviadaEn?.toMillis?.() ?? 0));
+    tutorsEstado = "listo";
+  } catch (err) {
+    console.error("No se pudieron cargar los tutores:", err);
+    tutorsEstado = "error";
+    tutorsError = err;
+  }
+  populateTutorSubjectFilter();
+  renderTutors();
+  renderAnalytics();
+  renderStats();
+  renderPendingList();
+  renderNotificationPreview();
+  renderNotificationFull();
+  renderSubjectList();
+  renderActivity();
+}
+
+function populateTutorSubjectFilter() {
+  const select = $("#admin-tutor-subject");
+  const actual = select.value || "all";
+  select.innerHTML =
+    '<option value="all">Todas</option>' +
+    MATERIAS.map((m) => `<option value="${m.id}">${m.nombre}</option>`).join("");
+  select.value = MATERIAS.some((m) => m.id === actual) ? actual : "all";
+}
+
 function renderTutorTabs() {
-  const counts = { pending: 0, verified: 0, suspended: 0 };
-  demoTutors.forEach((t) => {
+  const counts = { pending: 0, verified: 0, rejected: 0 };
+  tutors.forEach((t) => {
     counts[t.status] = (counts[t.status] || 0) + 1;
   });
 
   $$("[data-tutor-count]").forEach((el) => {
     el.textContent = counts[el.dataset.tutorCount] || 0;
   });
+}
+
+function tutorActionButtons(t, attr) {
+  if (t.status === "pending") {
+    return `
+      <button class="btn btn-primary" type="button" ${attr}-approve="${escapeHTML(t.id)}">Aprobar</button>
+      <button class="btn btn-secondary" type="button" ${attr}-reject="${escapeHTML(t.id)}">Rechazar</button>`;
+  }
+  if (t.status === "verified") {
+    return `<button class="btn btn-secondary" type="button" ${attr}-reject="${escapeHTML(t.id)}">Revocar aprobación</button>`;
+  }
+  return `<button class="btn btn-primary" type="button" ${attr}-approve="${escapeHTML(t.id)}">Aprobar</button>`;
+}
+
+function bindTutorActions(scope, attr) {
+  $$(`[${attr}-approve]`, scope).forEach((btn) =>
+    btn.addEventListener("click", () => setTutorStatus(btn.getAttribute(`${attr}-approve`), "aprobado", "aprobada"))
+  );
+  $$(`[${attr}-reject]`, scope).forEach((btn) =>
+    btn.addEventListener("click", () => setTutorStatus(btn.getAttribute(`${attr}-reject`), "rechazado", "rechazada"))
+  );
 }
 
 function renderTutors() {
@@ -465,14 +668,23 @@ function renderTutors() {
   const subject = $("#admin-tutor-subject").value;
   const grid = $("#admin-tutor-grid");
 
-  const filtered = demoTutors.filter((t) => {
+  if (tutorsEstado === "cargando") {
+    grid.innerHTML = '<p class="admin-empty">Cargando tutores…</p>';
+    return;
+  }
+  if (tutorsEstado === "error") {
+    grid.innerHTML = `<p class="admin-empty">No se pudieron cargar los tutores. ${escapeHTML(detalleError(tutorsError))}</p>`;
+    return;
+  }
+
+  const filtered = tutors.filter((t) => {
     const matchTab = t.status === tutorTab;
     const matchSearch =
       !search ||
       t.name.toLowerCase().includes(search) ||
       t.email.toLowerCase().includes(search) ||
       t.subject.toLowerCase().includes(search);
-    const matchSubject = subject === "all" || t.subject === subject;
+    const matchSubject = subject === "all" || t.materias.some((m) => materiaId(m) === subject);
     return matchTab && matchSearch && matchSubject;
   });
 
@@ -481,95 +693,159 @@ function renderTutors() {
     return;
   }
 
-  const statusLabels = { pending: "Pendiente", verified: "Verificado", suspended: "Suspendido" };
-
   grid.innerHTML = filtered
-    .map(
-      (t) => `
+    .map((t) => {
+      const r = tutorRating(t.id);
+      const enviada = fechaCorta(t.solicitudEnviadaEn);
+      return `
       <article class="admin-tutor-card">
         <div class="admin-tutor-card-top">
-          <span class="admin-initials">${t.initial}</span>
+          <span class="admin-initials">${escapeHTML(t.initial)}</span>
           <div>
-            <strong>${t.name}</strong>
-            <small>${t.email} · ${t.subject}</small>
+            <strong>${escapeHTML(t.name)}</strong>
+            <small>${escapeHTML(t.email)} · ${escapeHTML(t.subject || "Sin materias")}</small>
           </div>
         </div>
-        <p>Calificación: ${t.rating} (${t.reviews} opiniones)</p>
-        <span class="admin-status ${t.status}">${statusLabels[t.status]}</span>
+        <p>${r.total ? `Calificación: ${r.promedio} (${r.total} opiniones)` : "Sin calificaciones todavía"}${enviada ? ` · Solicitud: ${escapeHTML(enviada)}` : ""}</p>
+        <span class="admin-status ${t.status}">${TUTOR_STATUS_LABELS[t.status]}</span>
         <div class="admin-tutor-card-actions">
-          <button class="btn btn-secondary" type="button" data-tutor-detail="${t.id}">Ver perfil</button>
-          ${t.status === "pending" ? `
-            <button class="btn btn-primary" type="button" data-tutor-approve="${t.id}">Aprobar</button>
-            <button class="btn btn-secondary" type="button" data-tutor-reject="${t.id}">Rechazar</button>
-          ` : ""}
-          ${t.status === "verified" ? `
-            <button class="btn btn-secondary" type="button" data-tutor-suspend="${t.id}">Suspender</button>
-          ` : ""}
-          ${t.status === "suspended" ? `
-            <button class="btn btn-primary" type="button" data-tutor-activate="${t.id}">Activar</button>
-          ` : ""}
+          <button class="btn btn-secondary" type="button" data-tutor-detail="${escapeHTML(t.id)}">Ver solicitud</button>
+          ${tutorActionButtons(t, "data-tutor")}
         </div>
       </article>
-    `
-    )
+    `;
+    })
     .join("");
 
   $$("[data-tutor-detail]", grid).forEach((btn) =>
     btn.addEventListener("click", () => openTutorDetail(btn.dataset.tutorDetail))
   );
-  $$("[data-tutor-approve]", grid).forEach((btn) =>
-    btn.addEventListener("click", () => setTutorStatus(btn.dataset.tutorApprove, "verified", "aprobado"))
-  );
-  $$("[data-tutor-reject]", grid).forEach((btn) =>
-    btn.addEventListener("click", () => setTutorStatus(btn.dataset.tutorReject, "pending", "rechazado"))
-  );
-  $$("[data-tutor-suspend]", grid).forEach((btn) =>
-    btn.addEventListener("click", () => setTutorStatus(btn.dataset.tutorSuspend, "suspended", "suspendido"))
-  );
-  $$("[data-tutor-activate]", grid).forEach((btn) =>
-    btn.addEventListener("click", () => setTutorStatus(btn.dataset.tutorActivate, "verified", "activado"))
-  );
+  bindTutorActions(grid, "data-tutor");
 }
 
-function setTutorStatus(tutorId, newStatus, pastTense) {
-  const tutor = demoTutors.find((t) => String(t.id) === String(tutorId));
-  if (!tutor) return;
-  tutor.status = newStatus;
-  renderTutors();
-  renderStats();
-  renderPendingList();
-  showToast(`Solicitud de ${tutor.name} ${pastTense} (demostración). Con Firebase esta acción quedará registrada con tus permisos.`);
+async function setTutorStatus(tutorId, nuevoEstado, pastTense) {
+  const tutor = tutors.find((t) => t.id === tutorId);
+  if (!tutor || tutorsGuardando.has(tutorId)) return;
+
+  tutorsGuardando.add(tutorId);
+  try {
+    // Solo el admin puede cambiar «estado» (lo exigen las reglas de Firestore).
+    await updateDoc(doc(db, "usuarios", tutorId), {
+      estado: nuevoEstado,
+      revisadoPor: adminUid,
+      revisadoEn: serverTimestamp()
+    });
+    tutor.estado = nuevoEstado;
+    tutor.status = tutorStatusFromEstado(nuevoEstado);
+    renderTutors();
+    renderStats();
+    renderPendingList();
+    renderNotificationPreview();
+    renderNotificationFull();
+    renderSubjectList();
+    renderActivity();
+    $("#admin-tutor-dialog").close();
+    showToast(`Solicitud de ${tutor.name} ${pastTense}.`);
+  } catch (err) {
+    console.error("No se pudo actualizar el tutor:", err);
+    showToast(`No se pudo guardar la decisión. ${detalleError(err)}`);
+  } finally {
+    tutorsGuardando.delete(tutorId);
+  }
+}
+
+// Abre la hoja de vida (PDF guardado en hojasDeVida/{uid}) en una pestaña nueva.
+async function verHojaVida(tutorId) {
+  // La pestaña se abre ya, dentro del clic, para que el navegador no la bloquee.
+  const ventana = window.open("", "_blank");
+  try {
+    const snap = await getDoc(doc(db, "hojasDeVida", tutorId));
+    if (!snap.exists() || !snap.data().dataURL) {
+      ventana?.close();
+      showToast("Este tutor no tiene un PDF guardado.");
+      return;
+    }
+    const blob = await (await fetch(snap.data().dataURL)).blob();
+    const url = URL.createObjectURL(blob);
+    if (ventana) ventana.location.href = url;
+    else window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
+  } catch (err) {
+    console.error("No se pudo abrir la hoja de vida:", err);
+    ventana?.close();
+    showToast(`No se pudo abrir la hoja de vida. ${detalleError(err)}`);
+  }
 }
 
 function openTutorDetail(tutorId) {
-  const tutor = demoTutors.find((t) => String(t.id) === String(tutorId));
+  const tutor = tutors.find((t) => t.id === tutorId);
   if (!tutor) return;
 
-  const statusLabels = { pending: "Pendiente", verified: "Verificado", suspended: "Suspendido" };
+  const r = tutorRating(tutor.id);
   const dialog = $("#admin-tutor-dialog");
+  const lista = (arr) => escapeHTML(arr?.length ? arr.join(", ") : "—");
+  const tarifa = Number(tutor.tarifa) > 0
+    ? `$${Number(tutor.tarifa).toLocaleString("es-CO")} COP / hora`
+    : "—";
 
   $("#admin-tutor-detail").innerHTML = `
     <dl class="admin-detail-list">
-      <dt>Nombre</dt><dd>${tutor.name}</dd>
-      <dt>Correo</dt><dd>${tutor.email}</dd>
-      <dt>Materia</dt><dd>${tutor.subject}</dd>
-      <dt>Calificación</dt><dd>${tutor.rating} (${tutor.reviews} opiniones)</dd>
-      <dt>Estado</dt><dd><span class="admin-status ${tutor.status}">${statusLabels[tutor.status]}</span></dd>
-      <dt>Presentación</dt><dd>${tutor.bio}</dd>
+      <dt>Nombre</dt><dd>${escapeHTML(tutor.name)}</dd>
+      <dt>Correo</dt><dd>${escapeHTML(tutor.email)}</dd>
+      <dt>Título / carrera</dt><dd>${escapeHTML(tutor.titulo || "—")}</dd>
+      <dt>Institución</dt><dd>${escapeHTML(tutor.institucion || "—")}</dd>
+      <dt>Ciudad</dt><dd>${escapeHTML(tutor.ciudad || "—")}</dd>
+      <dt>Materias</dt><dd>${lista(tutor.materias)}</dd>
+      <dt>Disponibilidad</dt><dd>${lista(tutor.franjas)}</dd>
+      <dt>Tarifa</dt><dd>${escapeHTML(tarifa)}</dd>
+      <dt>Calificación</dt><dd>${r.total ? `${r.promedio} (${r.total} opiniones)` : "Sin calificaciones"}</dd>
+      <dt>Solicitud enviada</dt><dd>${escapeHTML(fechaCorta(tutor.solicitudEnviadaEn) || "—")}</dd>
+      <dt>Estado</dt><dd><span class="admin-status ${tutor.status}">${TUTOR_STATUS_LABELS[tutor.status]}</span></dd>
+      <dt>Presentación</dt><dd>${escapeHTML(tutor.presentacion || "—")}</dd>
+      <dt>Hoja de vida</dt><dd>${
+        tutor.tieneHojaVida
+          ? `<button class="btn btn-secondary" type="button" id="admin-tutor-cv">Ver PDF${tutor.hojaVidaPDF ? ` (${escapeHTML(tutor.hojaVidaPDF)})` : ""}</button>`
+          : escapeHTML(tutor.hojaVidaPDF ? `${tutor.hojaVidaPDF} (solo el nombre; el archivo no se guardó)` : "—")
+      }</dd>
     </dl>
+    <div class="admin-tutor-card-actions">
+      ${tutorActionButtons(tutor, "data-dialog-tutor")}
+    </div>
   `;
+
+  const detalle = $("#admin-tutor-detail");
+  $("#admin-tutor-cv", detalle)?.addEventListener("click", () => verHojaVida(tutor.id));
+  bindTutorActions(detalle, "data-dialog-tutor");
 
   dialog.showModal();
 }
 
 /* ---------- Renderizado: Materias ---------- */
+function subjectData(id) {
+  const tutoresDe = tutors.filter(
+    (t) => t.status === "verified" && t.materias.some((m) => materiaId(m) === id)
+  );
+  const tuts = statsTutorias.filter((t) => materiaId(t.materia) === id);
+  const calif = ratings.filter((r) => materiaId(r.materia) === id && r.estado === "visible");
+  const promedio = calif.length
+    ? (calif.reduce((a, r) => a + (Number(r.estrellas) || 0), 0) / calif.length).toFixed(1)
+    : null;
+  return {
+    tutores: tutoresDe,
+    total: tuts.length,
+    completadas: tuts.filter((t) => t.estado === "completada").length,
+    programadas: tuts.filter((t) => t.estado === "programada").length,
+    canceladas: tuts.filter((t) => t.estado === "cancelada").length,
+    promedio,
+    opiniones: calif.length
+  };
+}
+
 function renderSubjectList() {
-  const search = $("#admin-subject-search").value.trim().toLowerCase();
+  const search = normMateria($("#admin-subject-search").value);
   const list = $("#admin-subject-list");
 
-  const filtered = demoSubjects.filter(
-    (s) => !search || s.name.toLowerCase().includes(search) || s.level.toLowerCase().includes(search)
-  );
+  const filtered = MATERIAS.filter((m) => !search || normMateria(m.nombre).includes(search));
 
   if (filtered.length === 0) {
     list.innerHTML = '<p class="admin-empty">No se encontraron materias.</p>';
@@ -577,78 +853,61 @@ function renderSubjectList() {
   }
 
   list.innerHTML = filtered
-    .map(
-      (s) => `
-      <button class="admin-subject-item ${activeSubjectId === s.id ? "is-active" : ""}" type="button" data-subject-id="${s.id}">
+    .map((m) => {
+      const n = tutorsEstado === "listo" ? subjectData(m.id).tutores.length : null;
+      return `
+      <button class="admin-subject-item ${activeSubjectId === m.id ? "is-active" : ""}" type="button" data-subject-id="${m.id}">
         <svg class="icon" aria-hidden="true"><use href="#icon-book"></use></svg>
-        <span>${s.name}</span>
-        <small>${s.status === "active" ? "Activa" : "Inactiva"}</small>
-      </button>
-    `
-    )
+        <span>${m.nombre}</span>
+        <small>${n === null ? "…" : `${n} ${n === 1 ? "tutor" : "tutores"}`}</small>
+      </button>`;
+    })
     .join("");
 
   $$(".admin-subject-item", list).forEach((btn) =>
-    btn.addEventListener("click", () => showSubjectDetail(btn.dataset.subjectId))
+    btn.addEventListener("click", () => {
+      activeSubjectId = btn.dataset.subjectId;
+      renderSubjectList();
+    })
   );
+
+  showSubjectDetail(activeSubjectId);
 }
 
 function showSubjectDetail(subjectId) {
-  const subject = demoSubjects.find((s) => String(s.id) === String(subjectId));
-  if (!subject) return;
-
-  activeSubjectId = subject.id;
-  $("#admin-subject-detail-title").textContent = subject.name;
-  $("#admin-subject-detail-intro").hidden = true;
-
+  const materia = MATERIAS.find((m) => m.id === subjectId);
   const units = $("#admin-subject-units");
+  if (!materia) {
+    $("#admin-subject-detail-title").textContent = "Selecciona una materia";
+    $("#admin-subject-detail-intro").hidden = false;
+    units.hidden = true;
+    return;
+  }
+
+  $("#admin-subject-detail-title").textContent = materia.nombre;
+  $("#admin-subject-detail-intro").hidden = true;
   units.hidden = false;
-  units.innerHTML = subject.units
-    .map(
-      (u) => `
-      <div class="admin-unit">
-        <strong>${u.name} · ${subject.level}</strong>
-        <p>${u.detail}</p>
-      </div>
-    `
-    )
-    .join("");
 
-  const actions = $("#admin-subject-actions");
-  actions.hidden = false;
-  const toggleBtn = $("#admin-subject-toggle");
-  toggleBtn.textContent = subject.status === "active" ? "Desactivar materia" : "Activar materia";
-  toggleBtn.onclick = () => {
-    subject.status = subject.status === "active" ? "inactive" : "active";
-    showSubjectDetail(subject.id);
-    renderSubjectList();
-    renderStats();
-    showToast(`La materia "${subject.name}" quedó ${subject.status === "active" ? "activa" : "inactiva"} (demostración).`);
-  };
+  if (tutorsEstado !== "listo" || statsEstado !== "listo") {
+    units.innerHTML = `<div class="admin-unit"><p>${tutorsEstado === "error" || statsEstado === "error" ? "No se pudieron cargar los datos de la materia." : "Cargando…"}</p></div>`;
+    return;
+  }
 
-  renderSubjectList();
-}
-
-function openSubjectDialog() {
-  $("#admin-subject-name").value = "";
-  $("#admin-subject-error").textContent = "";
-  $("#admin-subject-dialog").showModal();
-  $("#admin-subject-name").focus();
-}
-
-function addSubject(name, level, status) {
-  const newId = Math.max(...demoSubjects.map((s) => s.id)) + 1;
-  demoSubjects.push({
-    id: newId,
-    name,
-    level,
-    status,
-    units: [{ name: "Unidad inicial", detail: "Contenido inicial de ejemplo." }]
-  });
-  renderSubjectList();
-  renderStats();
-  showToast(`Materia "${name}" agregada a la demostración.`);
-  $("#admin-subject-dialog").close();
+  const d = subjectData(materia.id);
+  units.innerHTML = `
+    <div class="admin-unit">
+      <strong>Tutores aprobados (${d.tutores.length})</strong>
+      <p>${d.tutores.length ? d.tutores.map((t) => escapeHTML(t.name)).join(", ") : "Aún no hay tutores aprobados en esta materia."}</p>
+    </div>
+    <div class="admin-unit">
+      <strong>Tutorías (${d.total})</strong>
+      <p>${d.completadas} completadas · ${d.programadas} programadas · ${d.canceladas} canceladas</p>
+    </div>
+    <div class="admin-unit">
+      <strong>Calificación</strong>
+      <p>${d.promedio ? `${d.promedio} ★ (${d.opiniones} ${d.opiniones === 1 ? "opinión visible" : "opiniones visibles"})` : "Sin calificaciones todavía."}</p>
+    </div>
+  `;
 }
 
 /* ---------- Tutorías: casos de soporte (Firestore: mensajesSoporte) ---------- */
@@ -675,6 +934,9 @@ async function loadCases() {
   }
   renderCases();
   renderStats();
+  renderNotificationPreview();
+  renderNotificationFull();
+  renderActivity();
 }
 
 function renderCaseTabs() {
@@ -894,36 +1156,45 @@ function openRatingDialog(ratingId) {
 }
 
 /* ---------- Notificaciones ---------- */
-function renderNotificationPreview() {
-  const preview = $("#admin-notification-preview");
-  preview.innerHTML = demoNotifications
-    .slice(0, 3)
-    .map(
-      (n) => `
-      <li>
-        <h3>${n.title}</h3>
-        <p>${n.detail} · ${n.time}</p>
-      </li>
-    `
-    )
-    .join("");
+// Pendientes reales: solicitudes de tutores por revisar y casos de soporte abiertos.
+function getNotifications() {
+  const solicitudes = tutors
+    .filter((t) => t.status === "pending")
+    .map((t) => ({
+      title: "Nueva solicitud de tutor",
+      detail: `${escapeHTML(t.name)} envió su solicitud de verificación.`,
+      time: fechaCorta(t.solicitudEnviadaEn) || "Reciente",
+      ms: t.solicitudEnviadaEn?.toMillis?.() ?? 0
+    }));
+  const casos = cases
+    .filter((c) => caseStatus(c) === "open")
+    .map((c) => ({
+      title: "Caso de soporte abierto",
+      detail: `${escapeHTML(c.usuarioNombre || "Un usuario")}: ${escapeHTML(c.asunto || "sin asunto")}`,
+      time: fechaCorta(c.creadoEn) || "Reciente",
+      ms: c.creadoEn?.toMillis?.() ?? 0
+    }));
+  return [...solicitudes, ...casos].sort((a, b) => b.ms - a.ms);
+}
 
-  const unread = demoNotifications.length;
+function notificationItems(avisos) {
+  return avisos.length
+    ? avisos
+        .map((n) => `<li><h3>${n.title}</h3><p>${n.detail} · ${escapeHTML(n.time)}</p></li>`)
+        .join("")
+    : "<li><p>No tienes pendientes por atender.</p></li>";
+}
+
+function renderNotificationPreview() {
+  const avisos = getNotifications();
+  $("#admin-notification-preview").innerHTML = notificationItems(avisos.slice(0, 3));
+  const unread = avisos.length;
   $("#admin-notification-count").textContent = unread > 9 ? "9+" : unread;
   $("#admin-notification-count").hidden = unread === 0;
 }
 
 function renderNotificationFull() {
-  $("#admin-notification-full").innerHTML = demoNotifications
-    .map(
-      (n) => `
-      <li>
-        <h3>${n.title}</h3>
-        <p>${n.detail} · ${n.time}</p>
-      </li>
-    `
-    )
-    .join("");
+  $("#admin-notification-full").innerHTML = notificationItems(getNotifications());
 }
 
 /* ---------- Perfil (Firestore: usuarios/{uid}) ---------- */
@@ -957,6 +1228,7 @@ async function loadProfile(uid) {
 /* ---------- Renderizado general ---------- */
 function renderAll() {
   renderStats();
+  renderAnalytics();
   renderPendingList();
   renderActivity();
   renderUsers();
@@ -990,7 +1262,7 @@ function bindNavigation() {
 
   $$("[data-pending]").forEach((button) => {
     button.addEventListener("click", () => {
-      showToast(`"${button.dataset.pending}" estará disponible más adelante (demostración).`);
+      showToast(`"${button.dataset.pending}" estará disponible más adelante.`);
     });
   });
 }
@@ -1046,34 +1318,11 @@ function bindTutorFilters() {
 
   $("#admin-tutor-search").addEventListener("input", renderTutors);
 
-  const subjectSelect = $("#admin-tutor-subject");
-  const subjects = [...new Set(demoTutors.map((t) => t.subject))];
-  subjectSelect.innerHTML =
-    '<option value="all">Todas</option>' +
-    subjects.map((s) => `<option value="${s}">${s}</option>`).join("");
-  subjectSelect.addEventListener("change", renderTutors);
+  $("#admin-tutor-subject").addEventListener("change", renderTutors);
 }
 
 function bindSubjectInteractions() {
   $("#admin-subject-search").addEventListener("input", renderSubjectList);
-  $("#admin-add-subject").addEventListener("click", openSubjectDialog);
-
-  const dialog = $("#admin-subject-dialog");
-  const form = $("#admin-subject-form");
-
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const name = $("#admin-subject-name").value.trim();
-    if (!name) {
-      $("#admin-subject-error").textContent = "Escribe el nombre de la materia.";
-      return;
-    }
-    addSubject(name, $("#admin-subject-level").value, $("#admin-subject-status").value);
-  });
-
-  dialog.addEventListener("click", (event) => {
-    if (event.target.matches("[data-close-dialog]")) dialog.close();
-  });
 }
 
 function bindCaseFilters() {
@@ -1198,6 +1447,11 @@ function init() {
   bindProfile();
   bindFotoPerfil();
   bindDialogs();
+  $("#admin-analytics-refresh").addEventListener("click", () => {
+    loadStats();
+    loadTutors();
+    loadRatings().then(() => { renderTutors(); renderAnalytics(); renderSubjectList(); renderActivity(); });
+  });
 
   renderAll();
 
@@ -1219,7 +1473,9 @@ function init() {
       $("#admin-profile-note").textContent = `No se pudo cargar tu perfil. ${detalleError(err)}`;
       return;
     }
-    loadRatings();
+    loadTutors();
+    loadStats();
+    loadRatings().then(() => { renderTutors(); renderAnalytics(); renderSubjectList(); renderActivity(); }); // los promedios salen de las calificaciones
     loadCases();
   });
 }
