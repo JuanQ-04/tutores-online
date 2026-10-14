@@ -2,6 +2,7 @@ rules_version = '2';
 
 // ============================================================================
 //  PROPUESTA de reglas para TutoresOn-Line  —  NO PROBADA contra tu proyecto.
+//  Actualización: se agregaron «calificaciones» y «mensajesSoporte» al final.
 //
 //  Cómo usarla: Firebase Console → Firestore Database → Reglas. Pega el
 //  contenido, pulsa «Simulador de reglas» y prueba estos casos ANTES de publicar:
@@ -52,7 +53,11 @@ service cloud.firestore {
           && request.resource.data.rol == resource.data.rol
           && (request.resource.data.estado == resource.data.estado
               || (resource.data.estado == 'incompleto'
-                  && request.resource.data.estado == 'pendiente')))
+                  && request.resource.data.estado == 'pendiente'))
+          // La foto de perfil es un texto (data URL) de menos de ~300 KB.
+          && (!('fotoURL' in request.resource.data)
+              || (request.resource.data.fotoURL is string
+                  && request.resource.data.fotoURL.size() < 300000)))
       );
     }
 
@@ -97,6 +102,63 @@ service cloud.firestore {
             || resource.data.tutorId == request.auth.uid)
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['estado', 'enlaceReunion', 'calificacion', 'comentario']);
+    }
+
+    // ---------------------------------------------------------- calificaciones
+    // NUEVO. El id del documento es el id de la tutoría: una sola calificación
+    // por tutoría. La crea el estudiante cuando la tutoría está «completada».
+    match /calificaciones/{tutoriaId} {
+      function tutoria() {
+        return get(/databases/$(database)/documents/tutorias/$(tutoriaId)).data;
+      }
+
+      // Las visibles son públicas (promedios en Buscar). Las ocultas solo las
+      // ven el estudiante que la escribió, el tutor calificado y el admin.
+      allow read: if resource.data.estado == 'visible'
+        || (autenticado() && (
+              resource.data.estudianteId == request.auth.uid ||
+              resource.data.tutorId == request.auth.uid ||
+              esAdmin()));
+
+      allow create: if autenticado()
+        && request.resource.data.estudianteId == request.auth.uid
+        && request.resource.data.tutoriaId == tutoriaId
+        && request.resource.data.estrellas is int
+        && request.resource.data.estrellas >= 1
+        && request.resource.data.estrellas <= 5
+        && request.resource.data.estado == 'visible'
+        && tutoria().estudianteId == request.auth.uid
+        && tutoria().tutorId == request.resource.data.tutorId
+        && tutoria().estado == 'completada';
+
+      // Solo el administrador modera: estrellas, visibilidad y retroalimentación.
+      allow update: if esAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['estrellas', 'estado', 'retroalimentacion', 'editadaPorAdmin', 'editadaEn'])
+        && request.resource.data.estado in ['visible', 'oculta']
+        && request.resource.data.estrellas is int
+        && request.resource.data.estrellas >= 1
+        && request.resource.data.estrellas <= 5;
+
+      allow delete: if esAdmin();
+    }
+
+    // --------------------------------------------------------- mensajesSoporte
+    // NUEVO. Centro de ayuda: cualquier usuario con sesión escribe al equipo;
+    // el administrador los gestiona como casos (abierto → revision → resuelto).
+    match /mensajesSoporte/{id} {
+      allow read: if autenticado()
+        && (resource.data.usuarioId == request.auth.uid || esAdmin());
+
+      allow create: if autenticado()
+        && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.estado == 'abierto'
+        && request.resource.data.asunto is string
+        && request.resource.data.mensaje is string
+        && request.resource.data.mensaje.size() <= 1000;
+
+      allow update: if esAdmin()
+        && request.resource.data.estado in ['abierto', 'revision', 'resuelto'];
     }
   }
 }

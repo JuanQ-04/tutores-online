@@ -471,3 +471,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Promedio de calificaciones en la tarjeta del tutor */
+.pub-score {
+  margin: 8px 0 0;
+  color: #b7791f;
+  font-size: 13px;
+  font-weight: 700;
+}

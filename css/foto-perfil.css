@@ -1,0 +1,29 @@
+/* Botón «cambiar foto» y avatares con foto (estudiante, tutor y administrador). */
+
+.photo-wrap { position: relative; display: inline-block; flex-shrink: 0; }
+
+.photo-edit {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--color-accent, #0f766e);
+  color: #fff;
+  cursor: pointer;
+}
+.photo-edit:disabled { opacity: 0.6; cursor: progress; }
+.photo-edit svg { width: 14px; height: 14px; }
+.photo-edit:focus-visible {
+  outline: 2px solid var(--color-accent, #0f766e);
+  outline-offset: 3px;
+}
+
+/* Avatar con foto: ocultar iniciales y mantener el círculo */
+.has-photo { color: transparent; background-color: transparent; }

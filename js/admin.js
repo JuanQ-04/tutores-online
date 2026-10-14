@@ -1,12 +1,59 @@
-/* js/admin.js — Panel del administrador (demostración)
-   Navegación por #, datos de ejemplo y acciones simuladas.
-   Los permisos reales se aplicarán al integrar Firebase. */
+/* js/admin.js — Panel del administrador
+   Navegación por #. Conectado a Firestore: Mi perfil, Calificaciones y
+   Tutorías (casos de soporte = colección «mensajesSoporte»).
+   Siguen con datos de ejemplo: Resumen, Usuarios, Tutores y Materias.
+   Seguridad (contraseña) la maneja js/configuracion.js.
+   Se carga como módulo: <script type="module" src="../js/admin.js"></script> */
 
-"use strict";
+import { auth, db } from "./firebase-config.js";
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  collection,
+  getDocs,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import {
+  pintarAvatar,
+  activarSelectorFoto,
+  guardarFotoPerfil
+} from "./foto-perfil.js";
 
 /* ---------- Utilidades ---------- */
 const $ = (selector, scope = document) => scope.querySelector(selector);
 const $$ = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
+  );
+}
+
+function estrellas(n) {
+  const v = Math.max(0, Math.min(5, Math.round(Number(n) || 0)));
+  return "★".repeat(v) + "☆".repeat(5 - v);
+}
+
+function fechaCorta(valor) {
+  const fecha = typeof valor?.toDate === "function" ? valor.toDate()
+    : typeof valor === "string" ? new Date(`${valor.slice(0, 10)}T12:00:00`)
+    : null;
+  if (!fecha || Number.isNaN(fecha.getTime())) return "";
+  return fecha.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function iniciales(nombre, porDefecto = "AD") {
+  return String(nombre).trim().split(/\s+/).filter(Boolean).slice(0, 2)
+    .map((p) => p[0].toUpperCase()).join("") || porDefecto;
+}
+
+function detalleError(err) {
+  return err?.code === "permission-denied"
+    ? "Firestore no lo permite (permission-denied): revisa que publicaste las reglas nuevas y que tu usuario tiene rol «admin»."
+    : "Revisa tu conexión e inténtalo de nuevo.";
+}
 
 const ADMIN_SECTIONS = [
   { id: "resumen", label: "Resumen" },
@@ -16,7 +63,9 @@ const ADMIN_SECTIONS = [
   { id: "tutorias", label: "Tutorías" },
   { id: "calificaciones", label: "Calificaciones" },
   { id: "notificaciones", label: "Notificaciones" },
-  { id: "perfil", label: "Mi perfil" }
+  { id: "perfil", label: "Mi perfil" },
+  { id: "seguridad", label: "Configuración" },
+  { id: "ayuda", label: "Centro de ayuda" }
 ];
 
 /* ---------- Datos de demostración ---------- */
@@ -175,83 +224,16 @@ const demoSubjects = [
   }
 ];
 
-const demoCases = [
-  {
-    id: 1,
-    student: "Diego Ávila",
-    tutor: "María Rodríguez",
-    reason: "No recibió el enlace de la sesión",
-    status: "open",
-    detail: "El estudiante reporta que 10 minutos antes de la tutoría aún no recibe el enlace de videollamada."
-  },
-  {
-    id: 2,
-    student: "Sofía Pérez",
-    tutor: "Julián Méndez",
-    reason: "Cambio de fecha",
-    status: "review",
-    detail: "La estudiante solicita mover su clase del jueves al viernes por un imprevisto académico."
-  },
-  {
-    id: 3,
-    student: "Andrés López",
-    tutor: "Carlos Gómez",
-    reason: "Problema con el pago",
-    status: "open",
-    detail: "El estudiante indica que se le cobró dos veces la misma tutoría."
-  },
-  {
-    id: 4,
-    student: "Valentina Ríos",
-    tutor: "Paola Duarte",
-    reason: "Solicitud de reembolso",
-    status: "resolved",
-    detail: "Resuelto: se reembolsó la sesión cancelada por el tutor."
-  }
-];
-
-const demoRatings = [
-  {
-    id: 1,
-    tutor: "María Rodríguez",
-    subject: "Cálculo integral",
-    stars: 5,
-    status: "visible",
-    text: "Explica con mucha claridad y usa ejemplos de la vida real. Me ayudó a pasar el parcial."
-  },
-  {
-    id: 2,
-    tutor: "Julián Méndez",
-    subject: "Álgebra lineal",
-    stars: 4,
-    status: "visible",
-    text: "Muy paciente, aunque a veces va rápido en los ejercicios largos."
-  },
-  {
-    id: 3,
-    tutor: "Carlos Gómez",
-    subject: "Física mecánica",
-    stars: 1,
-    status: "pending",
-    text: "El tutor llegó tarde y casi no resolvió mis dudas. No lo recomiendo." /* pendiente de moderación */
-  },
-  {
-    id: 4,
-    tutor: "María Rodríguez",
-    subject: "Cálculo integral",
-    stars: 5,
-    status: "pending",
-    text: "Excelente preparación para el parcial, muy organizada."
-  },
-  {
-    id: 5,
-    tutor: "Julián Méndez",
-    subject: "Álgebra lineal",
-    stars: 2,
-    status: "hidden",
-    text: "Comentario oculto por decisión del administrador."
-  }
-];
+/* Datos reales (Firestore) */
+let adminUid = null;
+let adminProfile = { nombre: "", apellido: "", email: "", fotoURL: "" };
+let ratings = [];            // colección «calificaciones»
+let ratingsEstado = "cargando";
+let ratingsError = null;
+let cases = [];              // colección «mensajesSoporte»
+let casesEstado = "cargando";
+let casesError = null;
+let editingRatingId = null;
 
 const demoNotifications = [
   { id: 1, title: "Nueva solicitud de tutor", detail: "Paola Duarte envió su solicitud de verificación.", time: "Hace 2 horas" },
@@ -343,7 +325,8 @@ function renderStats() {
   $("#admin-stat-users").textContent = demoUsers.length;
   $("#admin-stat-tutors").textContent = tutorsVerified;
   $("#admin-stat-materias").textContent = demoSubjects.length;
-  $("#admin-stat-pending").textContent = pendingTutors;
+  const openCases = cases.filter((c) => caseStatus(c) === "open").length;
+  $("#admin-stat-pending").textContent = pendingTutors + openCases;
 }
 
 function renderPendingList() {
@@ -668,32 +651,57 @@ function addSubject(name, level, status) {
   $("#admin-subject-dialog").close();
 }
 
-/* ---------- Renderizado: Tutorías (casos) ---------- */
+/* ---------- Tutorías: casos de soporte (Firestore: mensajesSoporte) ---------- */
+const CASE_STATUS = { abierto: "open", revision: "review", resuelto: "resolved" };
+const CASE_LABELS = { open: "Abierto", review: "En revisión", resolved: "Resuelto" };
+const ROLE_LABELS = { estudiante: "Estudiante", tutor: "Tutor", admin: "Administrador" };
+
+function caseStatus(c) {
+  return CASE_STATUS[c.estado] || "open";
+}
+
+async function loadCases() {
+  casesEstado = "cargando";
+  renderCases();
+  try {
+    const snap = await getDocs(collection(db, "mensajesSoporte"));
+    cases = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.creadoEn?.toMillis?.() ?? 0) - (a.creadoEn?.toMillis?.() ?? 0));
+    casesEstado = "listo";
+  } catch (err) {
+    console.error("No se pudieron cargar los casos:", err);
+    casesEstado = "error";
+    casesError = err;
+  }
+  renderCases();
+  renderStats();
+}
+
 function renderCaseTabs() {
   const counts = { open: 0, review: 0, resolved: 0 };
-  demoCases.forEach((c) => {
-    counts[c.status] = (counts[c.status] || 0) + 1;
-  });
-
+  cases.forEach((c) => { counts[caseStatus(c)] += 1; });
   $$("[data-case-count]").forEach((el) => {
-    el.textContent = counts[el.dataset.caseCount] || 0;
+    el.textContent = casesEstado === "listo" ? counts[el.dataset.caseCount] || 0 : "";
   });
 }
 
 function renderCases() {
   renderCaseTabs();
-
-  const search = $("#admin-case-search").value.trim().toLowerCase();
   const list = $("#admin-case-list");
 
-  const filtered = demoCases.filter((c) => {
-    const matchTab = c.status === caseTab;
-    const matchSearch =
-      !search ||
-      c.student.toLowerCase().includes(search) ||
-      c.tutor.toLowerCase().includes(search) ||
-      c.reason.toLowerCase().includes(search);
-    return matchTab && matchSearch;
+  if (casesEstado === "cargando") {
+    list.innerHTML = '<p class="admin-empty">Cargando mensajes de soporte…</p>';
+    return;
+  }
+  if (casesEstado === "error") {
+    list.innerHTML = `<p class="admin-empty">No se pudieron cargar los casos. ${escapeHTML(detalleError(casesError))}</p>`;
+    return;
+  }
+
+  const search = $("#admin-case-search").value.trim().toLowerCase();
+  const filtered = cases.filter((c) => {
+    const texto = `${c.usuarioNombre || ""} ${c.usuarioEmail || ""} ${c.asunto || ""} ${c.mensaje || ""}`.toLowerCase();
+    return caseStatus(c) === caseTab && (!search || texto.includes(search));
   });
 
   if (filtered.length === 0) {
@@ -701,140 +709,188 @@ function renderCases() {
     return;
   }
 
-  const statusLabels = { open: "Abierto", review: "En revisión", resolved: "Resuelto" };
-
-  list.innerHTML = filtered
-    .map(
-      (c) => `
+  list.innerHTML = filtered.map((c) => {
+    const st = caseStatus(c);
+    return `
       <article class="admin-case-card">
         <div class="admin-case-card-top">
-          <strong>${c.reason}</strong>
-          <span class="admin-status ${c.status}">${statusLabels[c.status]}</span>
+          <strong>${escapeHTML(c.asunto || "Sin asunto")}</strong>
+          <span class="admin-status ${st}">${CASE_LABELS[st]}</span>
         </div>
-        <p>${c.student} · Tutor: ${c.tutor}</p>
+        <p>${escapeHTML(c.usuarioNombre || "Usuario")} · ${escapeHTML(ROLE_LABELS[c.rol] || "Usuario")}${c.creadoEn ? ` · ${escapeHTML(fechaCorta(c.creadoEn))}` : ""}</p>
         <div class="admin-case-card-actions">
-          <button class="btn btn-secondary" type="button" data-case-detail="${c.id}">Ver detalle</button>
-          ${c.status === "open" ? `
-            <button class="btn btn-primary" type="button" data-case-review="${c.id}">Pasar a revisión</button>
-          ` : ""}
-          ${c.status === "review" ? `
-            <button class="btn btn-primary" type="button" data-case-resolve="${c.id}">Marcar resuelto</button>
-          ` : ""}
+          <button class="btn btn-secondary" type="button" data-case-detail="${escapeHTML(c.id)}">Ver detalle</button>
+          ${st === "open" ? `<button class="btn btn-primary" type="button" data-case-move="${escapeHTML(c.id)}" data-to="revision">Pasar a revisión</button>` : ""}
+          ${st === "review" ? `<button class="btn btn-primary" type="button" data-case-move="${escapeHTML(c.id)}" data-to="resuelto">Marcar resuelto</button>` : ""}
         </div>
-      </article>
-    `
-    )
-    .join("");
-
-  $$("[data-case-detail]", list).forEach((btn) =>
-    btn.addEventListener("click", () => openCaseDetail(btn.dataset.caseDetail))
-  );
-  $$("[data-case-review]", list).forEach((btn) =>
-    btn.addEventListener("click", () => setCaseStatus(btn.dataset.caseReview, "review", "pasado a revisión"))
-  );
-  $$("[data-case-resolve]", list).forEach((btn) =>
-    btn.addEventListener("click", () => setCaseStatus(btn.dataset.caseResolve, "resolved", "marcado como resuelto"))
-  );
+      </article>`;
+  }).join("");
 }
 
-function setCaseStatus(caseId, newStatus, pastTense) {
-  const caseItem = demoCases.find((c) => String(c.id) === String(caseId));
-  if (!caseItem) return;
-  caseItem.status = newStatus;
-  renderCases();
-  renderStats();
-  showToast(`Caso de ${caseItem.student} ${pastTense} (demostración).`);
+async function setCaseStatus(caseId, nuevoEstado) {
+  const item = cases.find((c) => c.id === caseId);
+  if (!item) return;
+  try {
+    await updateDoc(doc(db, "mensajesSoporte", caseId), { estado: nuevoEstado, actualizadoEn: serverTimestamp() });
+    item.estado = nuevoEstado;
+    renderCases();
+    renderStats();
+    showToast(nuevoEstado === "resuelto" ? "Caso marcado como resuelto." : "Caso pasado a revisión.");
+  } catch (err) {
+    console.error("No se pudo actualizar el caso:", err);
+    showToast(`No se pudo actualizar el caso. ${detalleError(err)}`);
+  }
 }
 
 function openCaseDetail(caseId) {
-  const caseItem = demoCases.find((c) => String(c.id) === String(caseId));
-  if (!caseItem) return;
-
-  const statusLabels = { open: "Abierto", review: "En revisión", resolved: "Resuelto" };
-  const dialog = $("#admin-case-dialog");
-
+  const c = cases.find((x) => x.id === caseId);
+  if (!c) return;
+  const st = caseStatus(c);
   $("#admin-case-detail").innerHTML = `
     <dl class="admin-detail-list">
-      <dt>Estudiante</dt><dd>${caseItem.student}</dd>
-      <dt>Tutor</dt><dd>${caseItem.tutor}</dd>
-      <dt>Motivo</dt><dd>${caseItem.reason}</dd>
-      <dt>Estado</dt><dd><span class="admin-status ${caseItem.status}">${statusLabels[caseItem.status]}</span></dd>
-      <dt>Descripción</dt><dd>${caseItem.detail}</dd>
-    </dl>
-  `;
-
-  dialog.showModal();
+      <dt>Usuario</dt><dd>${escapeHTML(c.usuarioNombre || "Usuario")} (${escapeHTML(ROLE_LABELS[c.rol] || "—")})</dd>
+      <dt>Correo</dt><dd>${c.usuarioEmail ? `<a href="mailto:${escapeHTML(c.usuarioEmail)}?subject=${encodeURIComponent("Re: " + (c.asunto || "Soporte TutoresOn-Line"))}">${escapeHTML(c.usuarioEmail)}</a>` : "—"}</dd>
+      <dt>Asunto</dt><dd>${escapeHTML(c.asunto || "")}</dd>
+      <dt>Fecha</dt><dd>${escapeHTML(fechaCorta(c.creadoEn) || "—")}</dd>
+      <dt>Estado</dt><dd><span class="admin-status ${st}">${CASE_LABELS[st]}</span></dd>
+      <dt>Mensaje</dt><dd class="admin-pre">${escapeHTML(c.mensaje || "")}</dd>
+    </dl>`;
+  $("#admin-case-dialog").showModal();
 }
 
-/* ---------- Renderizado: Calificaciones ---------- */
-function populateRatingSubjects() {
-  const select = $("#admin-rating-subject");
-  const subjects = [...new Set(demoRatings.map((r) => r.subject))];
-  select.innerHTML = '<option value="all">Todas</option>' +
-    subjects.map((s) => `<option value="${s}">${s}</option>`).join("");
+/* ---------- Calificaciones (Firestore: calificaciones) ---------- */
+async function loadRatings() {
+  ratingsEstado = "cargando";
+  renderRatings();
+  try {
+    const snap = await getDocs(collection(db, "calificaciones"));
+    ratings = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.creadaEn?.toMillis?.() ?? 0) - (a.creadaEn?.toMillis?.() ?? 0));
+    ratingsEstado = "listo";
+  } catch (err) {
+    console.error("No se pudieron cargar las calificaciones:", err);
+    ratingsEstado = "error";
+    ratingsError = err;
+  }
+  populateRatingFilters();
+  renderRatings();
+}
+
+function populateRatingFilters() {
+  const fill = (select, values) => {
+    const current = select.value;
+    select.innerHTML = '<option value="all">Todos</option>' +
+      values.map((v) => `<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`).join("");
+    if (values.includes(current)) select.value = current;
+  };
+  const uniq = (key) => [...new Set(ratings.map((r) => r[key]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+  fill($("#admin-rating-subject"), uniq("materia"));
+  fill($("#admin-rating-tutor"), uniq("tutorNombre"));
+  $("#admin-rating-subject").options[0].textContent = "Todas";
+}
+
+function renderRatingSummary(lista) {
+  const box = $("#admin-rating-summary");
+  if (!box) return;
+  const visibles = lista.filter((r) => r.estado === "visible");
+  const promedio = visibles.length
+    ? visibles.reduce((s, r) => s + (Number(r.estrellas) || 0), 0) / visibles.length
+    : 0;
+  box.innerHTML = `
+    <span><strong>${lista.length}</strong> calificaciones</span>
+    <span><strong>${visibles.length ? promedio.toFixed(1) : "—"}</strong> promedio (visibles)</span>
+    <span><strong>${lista.filter((r) => r.estado === "oculta").length}</strong> ocultas</span>`;
 }
 
 function renderRatings() {
-  const search = $("#admin-rating-search").value.trim().toLowerCase();
-  const subject = $("#admin-rating-subject").value;
-  const status = $("#admin-rating-status").value;
   const list = $("#admin-rating-list");
 
-  const filtered = demoRatings.filter((r) => {
-    const matchSearch =
-      !search ||
-      r.tutor.toLowerCase().includes(search) ||
-      r.subject.toLowerCase().includes(search) ||
-      r.text.toLowerCase().includes(search);
-    const matchSubject = subject === "all" || r.subject === subject;
-    const matchStatus = status === "all" || r.status === status;
-    return matchSearch && matchSubject && matchStatus;
-  });
-
-  if (filtered.length === 0) {
-    list.innerHTML = '<p class="admin-empty">No hay calificaciones con esos criterios.</p>';
+  if (ratingsEstado === "cargando") {
+    list.innerHTML = '<p class="admin-empty">Cargando calificaciones…</p>';
+    return;
+  }
+  if (ratingsEstado === "error") {
+    list.innerHTML = `<p class="admin-empty">No se pudieron cargar las calificaciones. ${escapeHTML(detalleError(ratingsError))}</p>`;
     return;
   }
 
-  const statusLabels = { pending: "Pendiente", visible: "Visible", hidden: "Oculta" };
+  const search = $("#admin-rating-search").value.trim().toLowerCase();
+  const subject = $("#admin-rating-subject").value;
+  const tutor = $("#admin-rating-tutor").value;
+  const status = $("#admin-rating-status").value;
 
-  list.innerHTML = filtered
-    .map(
-      (r) => `
+  const filtered = ratings.filter((r) => {
+    const texto = `${r.tutorNombre || ""} ${r.estudianteNombre || ""} ${r.materia || ""} ${r.comentario || ""}`.toLowerCase();
+    return (!search || texto.includes(search))
+      && (subject === "all" || r.materia === subject)
+      && (tutor === "all" || r.tutorNombre === tutor)
+      && (status === "all" || r.estado === status);
+  });
+
+  renderRatingSummary(filtered);
+
+  if (filtered.length === 0) {
+    list.innerHTML = ratings.length
+      ? '<p class="admin-empty">No hay calificaciones con esos criterios.</p>'
+      : '<p class="admin-empty">Todavía no hay calificaciones. Aparecen cuando un estudiante califica una tutoría completada.</p>';
+    return;
+  }
+
+  list.innerHTML = filtered.map((r) => {
+    const visible = r.estado === "visible";
+    return `
       <article class="admin-rating-card">
         <div class="admin-rating-card-top">
-          <strong>${r.tutor}</strong>
-          <span class="admin-rating-stars">${"★".repeat(r.stars)}${"☆".repeat(5 - r.stars)}</span>
-          <span class="admin-status ${r.status}">${statusLabels[r.status]}</span>
+          <strong>${escapeHTML(r.tutorNombre || "Tutor")}</strong>
+          <span class="admin-rating-stars" aria-label="${Number(r.estrellas) || 0} de 5">${estrellas(r.estrellas)}</span>
+          <span class="admin-status ${visible ? "visible" : "hidden"}">${visible ? "Visible" : "Oculta"}</span>
         </div>
-        <p><strong>${r.subject}</strong> — ${r.text}</p>
+        <p><strong>${escapeHTML(r.materia || "Materia")}</strong> · ${escapeHTML(r.estudianteNombre || "Estudiante")}${r.fechaTutoria ? ` · ${escapeHTML(fechaCorta(r.fechaTutoria))}` : ""}</p>
+        <p>${r.comentario ? `"${escapeHTML(r.comentario)}"` : "<em>Sin comentario</em>"}</p>
+        ${r.retroalimentacion ? `<p class="admin-rating-feedback"><strong>Retroalimentación:</strong> ${escapeHTML(r.retroalimentacion)}</p>` : ""}
         <div class="admin-rating-card-actions">
-          ${r.status === "visible" ? `
-            <button class="btn btn-secondary" type="button" data-rating-hidden="${r.id}">Ocultar</button>
-          ` : ""}
-          ${r.status === "hidden" || r.status === "pending" ? `
-            <button class="btn btn-primary" type="button" data-rating-visible="${r.id}">Hacer visible</button>
-          ` : ""}
+          <button class="btn btn-primary" type="button" data-rating-edit="${escapeHTML(r.id)}">Editar calificación</button>
+          <button class="btn btn-secondary" type="button" data-rating-toggle="${escapeHTML(r.id)}">${visible ? "Ocultar" : "Hacer visible"}</button>
         </div>
-      </article>
-    `
-    )
-    .join("");
-
-  $$("[data-rating-hidden]", list).forEach((btn) =>
-    btn.addEventListener("click", () => setRatingStatus(btn.dataset.ratingHidden, "hidden", "ocultado"))
-  );
-  $$("[data-rating-visible]", list).forEach((btn) =>
-    btn.addEventListener("click", () => setRatingStatus(btn.dataset.ratingVisible, "visible", "publicado"))
-  );
+      </article>`;
+  }).join("");
 }
 
-function setRatingStatus(ratingId, newStatus, pastTense) {
-  const rating = demoRatings.find((r) => String(r.id) === String(ratingId));
-  if (!rating) return;
-  rating.status = newStatus;
-  renderRatings();
-  showToast(`Comentario ${pastTense} (demostración).`);
+async function saveRating(ratingId, cambios, mensaje) {
+  const r = ratings.find((x) => x.id === ratingId);
+  if (!r) return false;
+  try {
+    await updateDoc(doc(db, "calificaciones", ratingId), {
+      ...cambios,
+      editadaPorAdmin: adminUid,
+      editadaEn: serverTimestamp()
+    });
+    Object.assign(r, cambios);
+    renderRatings();
+    showToast(mensaje);
+    return true;
+  } catch (err) {
+    console.error("No se pudo guardar la calificación:", err);
+    showToast(`No se pudo guardar. ${detalleError(err)}`);
+    return false;
+  }
+}
+
+function openRatingDialog(ratingId) {
+  const r = ratings.find((x) => x.id === ratingId);
+  if (!r) return;
+  editingRatingId = ratingId;
+  $("#admin-rating-dialog-info").innerHTML = `
+    <dl class="admin-detail-list">
+      <dt>Tutor</dt><dd>${escapeHTML(r.tutorNombre || "Tutor")}</dd>
+      <dt>Estudiante</dt><dd>${escapeHTML(r.estudianteNombre || "Estudiante")}</dd>
+      <dt>Materia</dt><dd>${escapeHTML(r.materia || "")}${r.fechaTutoria ? ` · ${escapeHTML(fechaCorta(r.fechaTutoria))}` : ""}</dd>
+      <dt>Comentario</dt><dd>${r.comentario ? `"${escapeHTML(r.comentario)}"` : "Sin comentario"}</dd>
+    </dl>`;
+  $("#admin-rating-stars").value = String(Math.round(Number(r.estrellas) || 5));
+  $("#admin-rating-visibility").value = r.estado === "oculta" ? "oculta" : "visible";
+  $("#admin-rating-feedback").value = r.retroalimentacion || "";
+  $("#admin-rating-dialog").showModal();
 }
 
 /* ---------- Notificaciones ---------- */
@@ -870,9 +926,32 @@ function renderNotificationFull() {
     .join("");
 }
 
-/* ---------- Perfil ---------- */
+/* ---------- Perfil (Firestore: usuarios/{uid}) ---------- */
 function renderProfile() {
-  $("#admin-profile-name").textContent = "Administrador del sistema";
+  const fullName = `${adminProfile.nombre} ${adminProfile.apellido}`.trim();
+  const avatar = iniciales(fullName);
+  $("#admin-name").value = adminProfile.nombre;
+  $("#admin-lastname").value = adminProfile.apellido;
+  $("#admin-email").value = adminProfile.email;
+  $("#admin-profile-name").textContent = fullName || "Administrador";
+  pintarAvatar($("#admin-profile-avatar"), adminProfile.fotoURL, avatar);
+  const top = $("#admin-top-avatar");
+  pintarAvatar(top, adminProfile.fotoURL, avatar);
+  top.setAttribute("aria-label", fullName ? `Mi perfil, ${fullName}` : "Mi perfil, administrador");
+}
+
+async function loadProfile(uid) {
+  const snap = await getDoc(doc(db, "usuarios", uid));
+  const d = snap.exists() ? snap.data() : {};
+  adminProfile = {
+    nombre: d.nombre || "",
+    apellido: d.apellido || "",
+    email: d.email || auth.currentUser?.email || "",
+    fotoURL: d.fotoURL || ""
+  };
+  renderProfile();
+  $("#admin-profile-note").textContent = "Tus datos se cargan desde tu cuenta. El correo y el rol no se editan aquí.";
+  return d;
 }
 
 /* ---------- Renderizado general ---------- */
@@ -884,7 +963,6 @@ function renderAll() {
   renderTutors();
   renderSubjectList();
   renderCases();
-  populateRatingSubjects();
   renderRatings();
   renderNotificationPreview();
   renderNotificationFull();
@@ -910,7 +988,7 @@ function bindNavigation() {
     history.replaceState(null, "", "#perfil");
   });
 
-  $$(".admin-pending-link").forEach((button) => {
+  $$("[data-pending]").forEach((button) => {
     button.addEventListener("click", () => {
       showToast(`"${button.dataset.pending}" estará disponible más adelante (demostración).`);
     });
@@ -1012,40 +1090,99 @@ function bindCaseFilters() {
   });
 
   $("#admin-case-search").addEventListener("input", renderCases);
+
+  $("#admin-case-list").addEventListener("click", (event) => {
+    const detail = event.target.closest("[data-case-detail]");
+    if (detail) { openCaseDetail(detail.dataset.caseDetail); return; }
+    const move = event.target.closest("[data-case-move]");
+    if (move) setCaseStatus(move.dataset.caseMove, move.dataset.to);
+  });
 }
 
 function bindRatingFilters() {
-  ["admin-rating-search", "admin-rating-subject", "admin-rating-status"].forEach((id) => {
+  ["admin-rating-search", "admin-rating-subject", "admin-rating-tutor", "admin-rating-status"].forEach((id) => {
     $(`#${id}`).addEventListener("input", renderRatings);
+  });
+
+  $("#admin-rating-list").addEventListener("click", (event) => {
+    const edit = event.target.closest("[data-rating-edit]");
+    if (edit) { openRatingDialog(edit.dataset.ratingEdit); return; }
+    const toggle = event.target.closest("[data-rating-toggle]");
+    if (toggle) {
+      const r = ratings.find((x) => x.id === toggle.dataset.ratingToggle);
+      if (!r) return;
+      const nuevo = r.estado === "visible" ? "oculta" : "visible";
+      saveRating(r.id, { estado: nuevo },
+        nuevo === "oculta" ? "Calificación ocultada del perfil público." : "Calificación visible de nuevo.");
+    }
+  });
+
+  $("#admin-rating-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!editingRatingId) return;
+    const estrellasNuevas = Number($("#admin-rating-stars").value);
+    if (!(estrellasNuevas >= 1 && estrellasNuevas <= 5)) return;
+    const ok = await saveRating(editingRatingId, {
+      estrellas: estrellasNuevas,
+      estado: $("#admin-rating-visibility").value,
+      retroalimentacion: $("#admin-rating-feedback").value.trim()
+    }, "Calificación actualizada.");
+    if (ok) $("#admin-rating-dialog").close();
   });
 }
 
 function bindProfile() {
   const form = $("#admin-profile-form");
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const name = $("#admin-name").value.trim();
     const lastname = $("#admin-lastname").value.trim();
-    if (!name || !lastname) {
+    if (!/\p{L}/u.test(name) || !/\p{L}/u.test(lastname)) {
       showToast("Completa el nombre y el apellido.");
       return;
     }
-    $("#admin-profile-name").textContent = `${name} ${lastname}`.trim();
-    $("#admin-profile-note").textContent = "Cambios guardados en la demostración. Con Firebase se guardarán en tu cuenta.";
-    showToast("Cambios guardados (demostración).");
-  });
-
-  $("#admin-logout").addEventListener("click", () => {
-    showToast("Cerrar sesión estará disponible al conectar Firebase.");
+    if (!adminUid) {
+      showToast("Tu sesión expiró. Vuelve a iniciar sesión.");
+      return;
+    }
+    try {
+      await updateDoc(doc(db, "usuarios", adminUid), { nombre: name, apellido: lastname });
+      adminProfile.nombre = name;
+      adminProfile.apellido = lastname;
+      renderProfile();
+      $("#admin-profile-note").textContent = "Cambios guardados en tu perfil.";
+      showToast("Perfil actualizado.");
+    } catch (err) {
+      console.error("No se pudo guardar el perfil:", err);
+      $("#admin-profile-note").textContent = `No se pudo guardar el perfil. ${detalleError(err)}`;
+    }
   });
 }
 
 function bindDialogs() {
   $$(".admin-dialog").forEach((dialog) => {
     dialog.addEventListener("click", (event) => {
-      if (event.target.matches("[data-close-dialog]")) dialog.close();
+      if (event.target.closest("[data-close-dialog]")) dialog.close();
     });
   });
+}
+
+/* ---------- Foto de perfil (se guarda en usuarios/{uid}.fotoURL) ---------- */
+function bindFotoPerfil() {
+  activarSelectorFoto(
+    $("#admin-photo-edit"),
+    async (url) => {
+      await guardarFotoPerfil(url);
+      adminProfile.fotoURL = url;
+      renderProfile();
+      $("#admin-profile-note").textContent = "Foto de perfil actualizada.";
+      showToast("Foto de perfil actualizada.");
+    },
+    (mensaje) => {
+      $("#admin-profile-note").textContent = mensaje;
+      showToast(mensaje);
+    }
+  );
 }
 
 /* ---------- Inicio ---------- */
@@ -1059,12 +1196,33 @@ function init() {
   bindCaseFilters();
   bindRatingFilters();
   bindProfile();
+  bindFotoPerfil();
   bindDialogs();
 
   renderAll();
 
   const hash = window.location.hash.replace("#", "");
   showSection(hash || "resumen");
+
+  // Solo un usuario con rol «admin» puede quedarse en este panel.
+  onAuthStateChanged(auth, async (usuario) => {
+    if (!usuario) return; // auth.js redirige al login
+    adminUid = usuario.uid;
+    try {
+      const datos = await loadProfile(usuario.uid);
+      if (datos.rol !== "admin") {
+        window.location.replace(datos.rol === "tutor" ? "tutor.html" : "estudiante.html");
+        return;
+      }
+    } catch (err) {
+      console.error("No se pudo verificar el rol:", err);
+      $("#admin-profile-note").textContent = `No se pudo cargar tu perfil. ${detalleError(err)}`;
+      return;
+    }
+    loadRatings();
+    loadCases();
+  });
 }
 
-document.addEventListener("DOMContentLoaded", init);
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+else init();

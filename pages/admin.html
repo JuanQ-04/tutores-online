@@ -10,8 +10,11 @@
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/dashboard.css">
   <link rel="stylesheet" href="../css/admin.css">
+  <link rel="stylesheet" href="../css/configuracion.css">
+  <link rel="stylesheet" href="../css/foto-perfil.css">
 
-  <script src="../js/admin.js" defer></script>
+  <script type="module" src="../js/admin.js"></script>
+  <script type="module" src="../js/configuracion.js"></script>
 </head>
 
 <body>
@@ -167,18 +170,18 @@
       </nav>
 
       <div class="sidebar-bottom">
-        <button class="help-card admin-pending-link" type="button" data-pending="Centro de ayuda">
+        <a class="help-card" href="#ayuda">
           <svg class="icon" aria-hidden="true"><use href="#icon-help"></use></svg>
           <span>
             <strong>¿Necesitas ayuda?</strong>
-            <small>Estamos para acompañarte</small>
+            <small>Guía del panel</small>
           </span>
-        </button>
+        </a>
 
-        <button class="secondary-navigation-link admin-pending-link" type="button" data-pending="Configuración">
+        <a class="secondary-navigation-link" href="#seguridad">
           <svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg>
           <span>Configuración</span>
-        </button>
+        </a>
 
         <button class="secondary-navigation-link sidebar-logout logout-button" type="button" aria-label="Cerrar sesión">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -500,7 +503,7 @@
             <div>
               <p class="admin-eyebrow">Supervisión</p>
               <h1 id="sessions-title">Tutorías</h1>
-              <p>Revisa las sesiones programadas y gestiona los casos de soporte de los estudiantes.</p>
+              <p>Gestiona los casos de soporte que envían estudiantes y tutores desde su Centro de ayuda.</p>
             </div>
           </div>
 
@@ -519,7 +522,7 @@
           <div class="admin-case-filters">
             <label class="admin-field">
               <span>Buscar caso</span>
-              <input id="admin-case-search" type="search" placeholder="Estudiante, tutor o motivo">
+              <input id="admin-case-search" type="search" placeholder="Usuario, correo o asunto">
             </label>
           </div>
 
@@ -532,14 +535,14 @@
             <div>
               <p class="admin-eyebrow">Calidad del servicio</p>
               <h1 id="ratings-title">Calificaciones</h1>
-              <p>Revisa los comentarios de los estudiantes y modera los que se muestran públicamente.</p>
+              <p>Libro global de calificaciones que dan los estudiantes a sus tutorías. Ajusta la nota, deja retroalimentación u oculta comentarios.</p>
             </div>
           </div>
 
-          <div class="admin-rating-filters">
+          <div class="admin-rating-filters admin-rating-filters-4">
             <label class="admin-field">
-              <span>Buscar comentario</span>
-              <input id="admin-rating-search" type="search" placeholder="Tutor, materia o texto">
+              <span>Buscar</span>
+              <input id="admin-rating-search" type="search" placeholder="Tutor, estudiante o texto">
             </label>
             <label class="admin-field">
               <span>Materia</span>
@@ -548,15 +551,22 @@
               </select>
             </label>
             <label class="admin-field">
+              <span>Tutor</span>
+              <select id="admin-rating-tutor">
+                <option value="all">Todos</option>
+              </select>
+            </label>
+            <label class="admin-field">
               <span>Estado</span>
               <select id="admin-rating-status">
                 <option value="all">Todas</option>
-                <option value="pending">Pendientes de revisión</option>
                 <option value="visible">Visibles</option>
-                <option value="hidden">Ocultas</option>
+                <option value="oculta">Ocultas</option>
               </select>
             </label>
           </div>
+
+          <p class="admin-rating-summary" id="admin-rating-summary" aria-live="polite"></p>
 
           <div class="admin-rating-list" id="admin-rating-list"></div>
         </section>
@@ -584,7 +594,7 @@
             <div>
               <p class="admin-eyebrow">Tu cuenta</p>
               <h1 id="admin-profile-title">Mi perfil</h1>
-              <p>Consulta los datos de tu cuenta de administrador.</p>
+              <p>Consulta y actualiza los datos de tu cuenta de administrador.</p>
             </div>
 
             <button class="btn btn-primary" type="submit" form="admin-profile-form">
@@ -594,31 +604,36 @@
           </div>
 
           <p class="demo-notice" id="admin-profile-note" role="status" aria-live="polite">
-            Los cambios solo se reflejan en esta demostración. El rol no es editable.
+            Cargando tu perfil…
           </p>
 
           <div class="admin-profile-layout">
             <form class="admin-surface" id="admin-profile-form">
               <div class="admin-profile-identity">
-                <span class="admin-initials" id="admin-profile-avatar" aria-hidden="true">AD</span>
+                <span class="photo-wrap">
+                  <span class="admin-initials" id="admin-profile-avatar" aria-hidden="true">AD</span>
+                  <button class="photo-edit" id="admin-photo-edit" type="button" aria-label="Cambiar foto de perfil">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                  </button>
+                </span>
                 <div>
-                  <h2 id="admin-profile-name">Administrador del sistema</h2>
-                  <p class="admin-muted">Administrador · Perfil de demostración</p>
+                  <h2 id="admin-profile-name">Administrador</h2>
+                  <p class="admin-muted">Administrador de TutoresOn-Line</p>
                 </div>
               </div>
 
               <div class="admin-profile-fields">
                 <label class="admin-field">
                   <span>Nombre</span>
-                  <input id="admin-name" type="text" value="Administrador" autocomplete="given-name" maxlength="60" required>
+                  <input id="admin-name" type="text" autocomplete="given-name" maxlength="60" required>
                 </label>
                 <label class="admin-field">
                   <span>Apellido</span>
-                  <input id="admin-lastname" type="text" value="del sistema" autocomplete="family-name" maxlength="60" required>
+                  <input id="admin-lastname" type="text" autocomplete="family-name" maxlength="60" required>
                 </label>
                 <label class="admin-field admin-field-full">
                   <span>Correo electrónico</span>
-                  <input id="admin-email" type="email" value="admin@correo.com" autocomplete="email" required>
+                  <input id="admin-email" type="email" autocomplete="email" readonly>
                 </label>
                 <label class="admin-field">
                   <span>Rol</span>
@@ -635,23 +650,89 @@
                   <span>Notificaciones</span>
                   <svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg>
                 </a>
-                <button type="button" data-pending="Seguridad">
+                <a href="#seguridad">
                   <svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg>
                   <span>Seguridad</span>
                   <svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg>
-                </button>
-                <button type="button" data-pending="Centro de ayuda">
+                </a>
+                <a href="#ayuda">
                   <svg class="icon" aria-hidden="true"><use href="#icon-help"></use></svg>
                   <span>Centro de ayuda</span>
                   <svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg>
-                </button>
-                <button type="button" id="admin-logout">
+                </a>
+                <button type="button" class="logout-button">
                   <svg class="icon" aria-hidden="true"><use href="#icon-logout"></use></svg>
                   <span>Cerrar sesión</span>
                   <svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg>
                 </button>
               </div>
             </aside>
+          </div>
+        </section>
+
+        <!-- Configuración y seguridad (js/configuracion.js) -->
+        <section id="seguridad" aria-labelledby="admin-security-title" hidden>
+          <div class="admin-page-heading">
+            <div>
+              <p class="admin-eyebrow">Configuración</p>
+              <h1 id="admin-security-title">Seguridad y cuenta</h1>
+              <p>Cambia tu contraseña y revisa desde dónde estás conectado.</p>
+            </div>
+            <a class="btn btn-secondary" href="#perfil">Volver a mi perfil</a>
+          </div>
+
+          <div class="config-grid">
+            <form class="admin-surface" id="security-form" novalidate>
+              <h2>Cambiar contraseña</h2>
+              <div class="admin-profile-fields">
+                <label class="admin-field admin-field-full">
+                  <span>Contraseña actual</span>
+                  <input type="password" name="actual" autocomplete="current-password">
+                </label>
+                <label class="admin-field">
+                  <span>Nueva contraseña</span>
+                  <input type="password" name="nueva" minlength="8" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+                </label>
+                <label class="admin-field">
+                  <span>Confirmar contraseña</span>
+                  <input type="password" name="confirmar" autocomplete="new-password">
+                </label>
+              </div>
+              <p class="demo-notice" id="security-note" role="status" aria-live="polite"></p>
+              <div class="config-actions">
+                <button class="btn btn-primary" type="submit">Actualizar contraseña</button>
+                <button class="btn btn-secondary" type="button" id="security-reset">Enviarme un correo para restablecerla</button>
+              </div>
+            </form>
+
+            <div class="admin-surface">
+              <h2>Tu cuenta y sesión</h2>
+              <dl class="config-list">
+                <dt>Correo</dt><dd id="config-email">—</dd>
+                <dt>Método de acceso</dt><dd id="config-provider">—</dd>
+                <dt>Cuenta creada</dt><dd id="config-created">—</dd>
+                <dt>Último inicio de sesión</dt><dd id="config-last-login">—</dd>
+                <dt>Dispositivo actual</dt><dd id="config-device">—</dd>
+              </dl>
+              <button class="btn btn-secondary logout-button" type="button">Cerrar sesión</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Centro de ayuda del administrador -->
+        <section id="ayuda" aria-labelledby="admin-help-title" hidden>
+          <div class="admin-page-heading">
+            <div>
+              <p class="admin-eyebrow">Guía del panel</p>
+              <h1 id="admin-help-title">Centro de ayuda</h1>
+              <p>Respuestas rápidas sobre cómo administrar TutoresOn-Line.</p>
+            </div>
+          </div>
+          <div class="admin-surface config-faq">
+            <details><summary>¿Dónde veo los mensajes que envían estudiantes y tutores?</summary><p>En Tutorías. Cada mensaje del Centro de ayuda llega como caso «Abierto»; pásalo a revisión y márcalo como resuelto cuando respondas por correo.</p></details>
+            <details><summary>¿Cómo modero una calificación?</summary><p>En Calificaciones pulsa «Editar calificación» para ajustar las estrellas, dejar retroalimentación para el tutor u ocultarla del perfil público.</p></details>
+            <details><summary>¿Cómo se convierte alguien en administrador?</summary><p>Por seguridad no se hace desde la app: en Firebase Console → Firestore → usuarios, cambia el campo «rol» del usuario a «admin».</p></details>
+            <details><summary>¿Cómo cambio mi contraseña?</summary><p>En Configuración → Seguridad y cuenta. Te pediremos tu contraseña actual.</p></details>
           </div>
         </section>
       </main>
@@ -729,9 +810,49 @@
     </form>
   </dialog>
 
+  <!-- Editar calificación -->
+  <dialog class="admin-dialog" id="admin-rating-dialog" aria-labelledby="admin-rating-dialog-title">
+    <form id="admin-rating-form">
+      <div class="admin-section-heading">
+        <h2 id="admin-rating-dialog-title">Editar calificación</h2>
+        <button class="admin-icon-button" type="button" data-close-dialog aria-label="Cerrar">
+          <svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+        </button>
+      </div>
+
+      <div id="admin-rating-dialog-info"></div>
+
+      <div class="admin-dialog-fields">
+        <label class="admin-field">
+          <span>Calificación</span>
+          <select id="admin-rating-stars">
+            <option value="5">★★★★★ (5)</option>
+            <option value="4">★★★★☆ (4)</option>
+            <option value="3">★★★☆☆ (3)</option>
+            <option value="2">★★☆☆☆ (2)</option>
+            <option value="1">★☆☆☆☆ (1)</option>
+          </select>
+        </label>
+        <label class="admin-field">
+          <span>Visibilidad</span>
+          <select id="admin-rating-visibility">
+            <option value="visible">Visible en el perfil del tutor</option>
+            <option value="oculta">Oculta</option>
+          </select>
+        </label>
+        <label class="admin-field admin-field-full">
+          <span>Retroalimentación (la ve el tutor)</span>
+          <textarea id="admin-rating-feedback" rows="3" maxlength="500" placeholder="Ej.: Comentario ocultado por lenguaje inapropiado."></textarea>
+        </label>
+      </div>
+
+      <button class="btn btn-primary" type="submit" style="width: 100%;">Guardar cambios</button>
+    </form>
+  </dialog>
+
   <p class="admin-toast" id="admin-toast" role="status" aria-live="polite" hidden></p>
 
   <script type="module" src="../js/auth.js"></script>
 
 </body>
-</html>
+</html>

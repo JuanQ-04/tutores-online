@@ -1,5 +1,6 @@
 // js/tutor.js — Panel del tutor
-// Perfil, Solicitudes, Tutorías y Disponibilidad conectados a Firestore.
+// Perfil, Solicitudes, Tutorías, Disponibilidad y Calificaciones conectados a
+// Firestore. Seguridad y Centro de ayuda: js/configuracion.js.
 // Notificaciones siguen con datos de demostración.
 
 import { auth, db } from "./firebase-config.js";
@@ -17,6 +18,11 @@ import {
 import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import {
+  pintarAvatar,
+  activarSelectorFoto,
+  guardarFotoPerfil
+} from "./foto-perfil.js";
 
 (() => {
   "use strict";
@@ -32,6 +38,7 @@ import {
   let tutoriasData = [];    // documentos crudos de la colección "tutorias"
   let blocks = [];          // disponibilidad, sincronizada con Firestore
   let tutorUid = null;      // uid del tutor autenticado
+  let calificacionesData = []; // calificaciones que recibió este tutor
 
   const notifications = [
     {
@@ -47,7 +54,8 @@ import {
     email: "",
     city: "",
     rate: "",
-    presentation: ""
+    presentation: "",
+    photo: ""
   };
 
   const titles = {
@@ -56,7 +64,9 @@ import {
     disponibilidad: "Disponibilidad",
     tutorias: "Mis tutorías",
     notificaciones: "Notificaciones",
-    perfil: "Mi perfil"
+    perfil: "Mi perfil",
+    seguridad: "Configuración",
+    ayuda: "Centro de ayuda"
   };
 
   const statusLabels = {
@@ -609,9 +619,63 @@ import {
           <dt>Estado</dt><dd>${statusLabels[t.status]}</dd>
         </dl>
         ${t.message ? `<p class="tutor-muted">"${escapeHTML(t.message)}"</p>` : ""}
+        ${t.status === "completed" ? calificacionDeTutoriaHTML(t.id) : ""}
         <div class="tutor-detail-actions">${actions}</div>`;
       $("#tutor-detail-dialog").showModal();
     }
+  }
+
+  // ----------------------------------------------------------------
+  // Calificaciones recibidas
+  // ----------------------------------------------------------------
+
+  function estrellas(n) {
+    const v = Math.round(Number(n) || 0);
+    return "★".repeat(v) + "☆".repeat(5 - v);
+  }
+
+  function calificacionDeTutoriaHTML(tutoriaId) {
+    const c = calificacionesData.find((x) => x.id === tutoriaId);
+    if (!c) return `<p class="tutor-muted">El estudiante todavía no ha calificado esta tutoría.</p>`;
+    return `<div class="review-inline">
+      <span class="rating-readonly">${estrellas(c.estrellas)}</span>
+      ${c.comentario ? `<p>"${escapeHTML(c.comentario)}"</p>` : ""}
+    </div>`;
+  }
+
+  function renderCalificaciones() {
+    const visibles = calificacionesData.filter((c) => c.estado === "visible");
+    const total = visibles.length;
+    const promedio = total
+      ? visibles.reduce((sum, c) => sum + (Number(c.estrellas) || 0), 0) / total
+      : 0;
+
+    $("#tutor-stat-rating").textContent = total ? `${promedio.toFixed(1)} / 5` : "—";
+    $("#tutor-stat-reviews").textContent = total
+      ? `${total} ${total === 1 ? "opinión" : "opiniones"} de estudiantes`
+      : "Aún no tienes opiniones";
+
+    $("#tutor-reviews-summary").textContent = total
+      ? `★ ${promedio.toFixed(1)} · ${total} ${total === 1 ? "opinión" : "opiniones"}`
+      : "Sin calificaciones";
+
+    const ordenadas = [...calificacionesData].sort(
+      (a, b) => (b.creadaEn?.toMillis?.() ?? 0) - (a.creadaEn?.toMillis?.() ?? 0)
+    );
+
+    $("#tutor-reviews-list").innerHTML = ordenadas.length
+      ? ordenadas.map((c) => `
+          <li class="review-item${c.estado === "oculta" ? " is-hidden" : ""}">
+            <div class="review-top">
+              <span class="rating-readonly">${estrellas(c.estrellas)}</span>
+              <strong>${escapeHTML(String(c.estudianteNombre || "Estudiante").split(" ")[0])}</strong>
+              <small>${escapeHTML(c.materia || "")}${c.fechaTutoria ? ` · ${escapeHTML(formatDate(c.fechaTutoria))}` : ""}</small>
+              ${c.estado === "oculta" ? '<span class="tutor-status cancelled">Oculta por el administrador</span>' : ""}
+            </div>
+            ${c.comentario ? `<p>"${escapeHTML(c.comentario)}"</p>` : ""}
+            ${c.retroalimentacion ? `<p class="review-feedback"><strong>Nota del administrador:</strong> ${escapeHTML(c.retroalimentacion)}</p>` : ""}
+          </li>`).join("")
+      : `<li class="tutor-muted">Cuando marques una tutoría como completada, el estudiante podrá calificarte y su opinión aparecerá aquí.</li>`;
   }
 
   // ----------------------------------------------------------------
@@ -794,8 +858,8 @@ import {
     $("#tutor-presentation").value = profile.presentation;
 
     $("#tutor-profile-name").textContent = fullName || "Tutor";
-    $("#tutor-profile-avatar").textContent = avatarText;
-    $("#tutor-top-avatar").textContent = avatarText;
+    pintarAvatar($("#tutor-profile-avatar"), profile.photo, avatarText);
+    pintarAvatar($("#tutor-top-avatar"), profile.photo, avatarText);
     $("#tutor-top-avatar").setAttribute(
       "aria-label",
       fullName ? `Mi perfil, ${fullName}` : "Mi perfil"
@@ -852,7 +916,8 @@ import {
         email: profile.email,
         city: $("#tutor-city").value,
         rate: String(tarifa),
-        presentation: $("#tutor-presentation").value
+        presentation: $("#tutor-presentation").value,
+        photo: profile.photo
       };
 
       aplicarPerfilTutor();
@@ -866,6 +931,24 @@ import {
       showToast("No se pudo guardar el perfil.");
     }
   });
+
+  // Cambiar foto de perfil
+  activarSelectorFoto(
+    $("#tutor-photo-edit"),
+    async (url) => {
+      await guardarFotoPerfil(url);
+      profile.photo = url;
+      aplicarPerfilTutor();
+      const nota = $("#tutor-profile-note");
+      if (nota) nota.textContent = "Foto de perfil actualizada.";
+      showToast("Foto de perfil actualizada.");
+    },
+    (mensaje) => {
+      const nota = $("#tutor-profile-note");
+      if (nota) nota.textContent = mensaje;
+      showToast(mensaje);
+    }
+  );
 
   // ----------------------------------------------------------------
   // Firestore: carga de datos
@@ -884,7 +967,8 @@ import {
         email: datos.email || auth.currentUser?.email || "",
         city: datos.ciudad || "",
         rate: datos.tarifa != null ? String(datos.tarifa) : "",
-        presentation: datos.presentacion || ""
+        presentation: datos.presentacion || "",
+        photo: datos.fotoURL || ""
       };
 
       // Disponibilidad guardada en el documento del tutor
@@ -932,12 +1016,23 @@ import {
     }
   }
 
+  async function cargarCalificaciones(uid) {
+    try {
+      const q = query(collection(db, "calificaciones"), where("tutorId", "==", uid));
+      const snap = await getDocs(q);
+      calificacionesData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    } catch (err) {
+      console.warn("No se pudieron cargar las calificaciones:", err);
+    }
+  }
+
   async function cargarTodo(uid) {
     tutorUid = uid;
     await Promise.all([
       cargarPerfilTutor(uid),
       cargarSolicitudes(uid),
-      cargarTutorias(uid)
+      cargarTutorias(uid),
+      cargarCalificaciones(uid)
     ]);
     renderAll();
     navigate();
@@ -974,6 +1069,7 @@ import {
       batch.set(tutoriaRef, {
         solicitudId,
         tutorId: rawSol.tutorId,
+        tutorNombre: rawSol.tutorNombre || `${profile.name} ${profile.lastname}`.trim(),
         estudianteId: rawSol.estudianteId,
         estudianteNombre: rawSol.estudianteNombre,
         materia: rawSol.materia,
@@ -1047,7 +1143,9 @@ import {
         `Actualizaste la tutoría con ${rawTut.estudianteNombre}.`
       );
       renderAll();
-      showToast(`Tutoría marcada como ${label}.`);
+      showToast(nuevoEstado === "completada"
+        ? "Tutoría completada. El estudiante ya puede calificarla."
+        : `Tutoría marcada como ${label}.`);
     } catch (err) {
       console.error("Error al actualizar tutoría:", err);
       showToast("No se pudo actualizar la tutoría. Revisa tu conexión.");
@@ -1149,6 +1247,7 @@ import {
     renderSessions();
     renderCalendar();
     renderNotifications();
+    renderCalificaciones();
   }
 
   // Render inicial con datos vacíos mientras carga Firestore
@@ -1164,4 +1263,4 @@ import {
       await cargarTodo(usuario.uid);
     }
   });
-})();
+})();

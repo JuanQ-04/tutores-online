@@ -14,9 +14,12 @@
   <link rel="stylesheet" href="../css/tutor-inicio.css">
   <link rel="stylesheet" href="../css/tutor-solicitudes.css">
   <link rel="stylesheet" href="../css/tutor-disponibilidad.css">
+  <link rel="stylesheet" href="../css/configuracion.css">
   <link rel="stylesheet" href="../css/tutor-tutorias.css">
+  <link rel="stylesheet" href="../css/foto-perfil.css">
 
   <script type="module" src="../js/tutor.js"></script>
+  <script type="module" src="../js/configuracion.js"></script>
 </head>
 
 <body class="tutor-panel">
@@ -132,18 +135,18 @@
       </nav>
 
       <div class="sidebar-bottom">
-        <button class="help-card tutor-pending-link" type="button" data-pending="Centro de ayuda">
+        <a class="help-card" href="#ayuda">
           <svg class="icon" aria-hidden="true"><use href="#t-help"></use></svg>
           <span>
             <strong>¿Necesitas ayuda?</strong>
             <small>Estamos para acompañarte</small>
           </span>
-        </button>
+        </a>
 
-        <button class="secondary-navigation-link tutor-pending-link" type="button" data-pending="Configuración">
+        <a class="secondary-navigation-link" href="#seguridad">
           <svg class="icon" aria-hidden="true"><use href="#t-settings"></use></svg>
           <span>Configuración</span>
-        </button>
+        </a>
 
         <button class="secondary-navigation-link sidebar-logout logout-button" type="button" aria-label="Cerrar sesión">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -261,9 +264,9 @@
                 <svg class="icon" aria-hidden="true"><use href="#t-star"></use></svg>
               </span>
               <div>
-                <p class="tutor-label">Calificación de ejemplo</p>
-                <strong>4.9 / 5</strong>
-                <small>38 opiniones de demostración</small>
+                <p class="tutor-label">Tu calificación</p>
+                <strong id="tutor-stat-rating">—</strong>
+                <small id="tutor-stat-reviews">Aún no tienes opiniones</small>
               </div>
             </article>
           </div>
@@ -475,10 +478,15 @@
           <div class="tutor-profile-layout">
             <form class="tutor-surface" id="tutor-profile-form">
               <div class="tutor-profile-identity">
-                <span class="tutor-initials" id="tutor-profile-avatar" aria-hidden="true">MR</span>
+                <span class="photo-wrap">
+                  <span class="tutor-initials" id="tutor-profile-avatar" aria-hidden="true">MR</span>
+                  <button class="photo-edit" id="tutor-photo-edit" type="button" aria-label="Cambiar foto de perfil">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                  </button>
+                </span>
                 <div>
                   <h2 id="tutor-profile-name">María Rodríguez</h2>
-                  <p class="tutor-muted">Tutor · Perfil de demostración</p>
+                  <p class="tutor-muted">Tutor de TutoresOn-Line</p>
                 </div>
               </div>
 
@@ -518,18 +526,100 @@
                   <span>Notificaciones</span>
                   <svg class="icon" aria-hidden="true"><use href="#t-chevron"></use></svg>
                 </a>
-                <button type="button" data-pending="Seguridad">
+                <a href="#seguridad">
                   <svg class="icon" aria-hidden="true"><use href="#t-settings"></use></svg>
                   <span>Seguridad</span>
                   <svg class="icon" aria-hidden="true"><use href="#t-chevron"></use></svg>
-                </button>
-                <button type="button" data-pending="Centro de ayuda">
+                </a>
+                <a href="#ayuda">
                   <svg class="icon" aria-hidden="true"><use href="#t-help"></use></svg>
                   <span>Centro de ayuda</span>
                   <svg class="icon" aria-hidden="true"><use href="#t-chevron"></use></svg>
-                </button>
+                </a>
               </div>
             </aside>
+          </div>
+
+          <section class="tutor-surface config-reviews" aria-labelledby="tutor-reviews-title">
+            <div class="tutor-section-heading">
+              <div>
+                <p class="tutor-eyebrow">Calificaciones</p>
+                <h2 id="tutor-reviews-title">Lo que dicen tus estudiantes</h2>
+              </div>
+              <strong class="rating-summary" id="tutor-reviews-summary">—</strong>
+            </div>
+            <ul class="review-list" id="tutor-reviews-list"></ul>
+          </section>
+        </section>
+
+        <!-- Configuración y seguridad (js/configuracion.js) -->
+        <section id="seguridad" aria-labelledby="tutor-security-title" hidden>
+          <div class="tutor-page-heading">
+            <div>
+              <p class="tutor-eyebrow">Configuración</p>
+              <h1 id="tutor-security-title">Seguridad y cuenta</h1>
+              <p>Cambia tu contraseña y revisa desde dónde estás conectado.</p>
+            </div>
+            <a class="tutor-button is-outline" href="#perfil">Volver a mi perfil</a>
+          </div>
+
+          <div class="config-grid">
+            <form class="tutor-surface" id="security-form" novalidate>
+              <h2>Cambiar contraseña</h2>
+              <div class="tutor-profile-fields">
+                <label class="tutor-field tutor-field-full">
+                  <span>Contraseña actual</span>
+                  <input type="password" name="actual" autocomplete="current-password">
+                </label>
+                <label class="tutor-field">
+                  <span>Nueva contraseña</span>
+                  <input type="password" name="nueva" minlength="8" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+                </label>
+                <label class="tutor-field">
+                  <span>Confirmar contraseña</span>
+                  <input type="password" name="confirmar" autocomplete="new-password">
+                </label>
+              </div>
+              <p class="demo-notice" id="security-note" role="status" aria-live="polite"></p>
+              <div class="config-actions">
+                <button class="tutor-button" type="submit">Actualizar contraseña</button>
+                <button class="tutor-button is-outline" type="button" id="security-reset">Enviarme un correo para restablecerla</button>
+              </div>
+            </form>
+
+            <div class="tutor-surface">
+              <h2>Tu cuenta y sesión</h2>
+              <dl class="config-list">
+                <dt>Correo</dt><dd id="config-email">—</dd>
+                <dt>Método de acceso</dt><dd id="config-provider">—</dd>
+                <dt>Cuenta creada</dt><dd id="config-created">—</dd>
+                <dt>Último inicio de sesión</dt><dd id="config-last-login">—</dd>
+                <dt>Dispositivo actual</dt><dd id="config-device">—</dd>
+              </dl>
+              <button class="tutor-button is-danger logout-button" type="button">Cerrar sesión</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Centro de ayuda -->
+        <section id="ayuda" aria-labelledby="tutor-help-title" hidden>
+          <div class="tutor-page-heading">
+            <div>
+              <p class="tutor-eyebrow">Estamos para acompañarte</p>
+              <h1 id="tutor-help-title">Centro de ayuda</h1>
+              <p>Resuelve tus dudas o escribe al equipo de TutoresOn-Line.</p>
+            </div>
+            <button class="tutor-button" type="button" data-open-contact>
+              <svg class="icon" aria-hidden="true"><use href="#t-help"></use></svg>
+              Escribir al equipo
+            </button>
+          </div>
+
+          <div class="tutor-surface config-faq">
+            <details><summary>¿Cómo publico mis horarios?</summary><p>En Disponibilidad pulsa «Agregar bloque», elige fecha, hora y modalidad. Los estudiantes solo pueden reservar en esos bloques.</p></details>
+            <details><summary>¿Qué pasa cuando acepto una solicitud?</summary><p>Se crea la tutoría y la verás en Mis tutorías → Confirmadas. Si la rechazas, el estudiante verá la solicitud como cancelada.</p></details>
+            <details><summary>¿Cómo recibo calificaciones?</summary><p>Después de la sesión, abre la tutoría y pulsa «Marcar completada». Así el estudiante podrá calificarte de 1 a 5 estrellas.</p></details>
+            <details><summary>¿Puedo cambiar mi tarifa?</summary><p>Sí, en Mi perfil. La nueva tarifa aplica a las solicitudes que lleguen después del cambio.</p></details>
           </div>
         </section>
       </main>
@@ -583,6 +673,30 @@
       </button>
     </div>
     <div id="tutor-detail-content"></div>
+  </dialog>
+
+  <!-- Contacto con el equipo de soporte -->
+  <dialog class="tutor-dialog" id="contact-dialog" aria-labelledby="contact-dialog-title">
+    <form id="contact-form" novalidate>
+      <div class="tutor-section-heading">
+        <h2 id="contact-dialog-title">Escribir al equipo</h2>
+        <button class="tutor-icon-button" type="button" data-close-dialog aria-label="Cerrar">
+          <svg class="icon" aria-hidden="true"><use href="#t-close"></use></svg>
+        </button>
+      </div>
+      <div class="tutor-dialog-fields">
+        <label class="tutor-field tutor-field-full">
+          <span>Asunto</span>
+          <input type="text" name="asunto" maxlength="120" required>
+        </label>
+        <label class="tutor-field tutor-field-full">
+          <span>Mensaje</span>
+          <textarea name="mensaje" rows="5" maxlength="1000" required placeholder="Cuéntanos qué pasó"></textarea>
+        </label>
+      </div>
+      <p class="tutor-form-error" id="contact-note" role="status" aria-live="polite"></p>
+      <button class="tutor-button" type="submit">Enviar mensaje</button>
+    </form>
   </dialog>
 
   <p class="tutor-toast" id="tutor-toast" role="status" aria-live="polite" hidden></p>

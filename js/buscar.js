@@ -84,10 +84,15 @@
   const icono = (name) =>
     `<svg class="icon" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
 
-  function avatar(nombre, size) {
+  // Foto de perfil: módulo compartido con los paneles. Si no carga, se ven las iniciales.
+  let FOTO = null; // { estiloFoto, textoSinFoto }
+
+  function avatar(nombre, size, fotoURL) {
+    const estilo = FOTO ? FOTO.estiloFoto(fotoURL) : "";
+    const texto = FOTO ? FOTO.textoSinFoto(fotoURL, iniciales(nombre)) : iniciales(nombre);
     return `<div class="pub-photo" aria-hidden="true" style="width:${size}px;height:${size}px;border-radius:50%;
       background:var(--color-primary,#6366f1);color:#fff;display:flex;align-items:center;
-      justify-content:center;font-size:${Math.round(size / 2.6)}px;font-weight:700">${escapeHTML(iniciales(nombre))}</div>`;
+      justify-content:center;font-size:${Math.round(size / 2.6)}px;font-weight:700;${estilo}">${escapeHTML(texto)}</div>`;
   }
 
   /* ---------- Carga desde Firestore ---------- */
@@ -99,6 +104,12 @@
       const { collection, query, where, getDocs } = await import(
         "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"
       );
+
+      try {
+        FOTO = await import("./foto-perfil.js");
+      } catch (e) {
+        console.warn("No se pudo cargar el módulo de fotos:", e);
+      }
 
       const snap = await getDocs(query(
         collection(db, "usuarios"),
@@ -128,9 +139,35 @@
           bio: data.presentacion || "Tutor registrado en la plataforma.",
           tarifa: Number(data.tarifa) || 0,
           disponibilidad,
-          tone: TONES[i % TONES.length]
+          foto: data.fotoURL || "",
+          tone: TONES[i % TONES.length],
+          promedio: 0,
+          opiniones: 0
         };
       });
+
+      // Calificaciones visibles → promedio por tutor. Si falla, el catálogo sigue.
+      try {
+        const califSnap = await getDocs(query(
+          collection(db, "calificaciones"),
+          where("estado", "==", "visible")
+        ));
+        const suma = {};
+        califSnap.docs.forEach((d) => {
+          const c = d.data();
+          if (!c.tutorId) return;
+          suma[c.tutorId] = suma[c.tutorId] || { s: 0, n: 0 };
+          suma[c.tutorId].s += Number(c.estrellas) || 0;
+          suma[c.tutorId].n += 1;
+        });
+        TUTORES.forEach((t) => {
+          const r = suma[t.id];
+          if (r && r.n) { t.promedio = r.s / r.n; t.opiniones = r.n; }
+        });
+      } catch (errorCalif) {
+        console.warn("No se pudieron cargar las calificaciones:", errorCalif);
+      }
+
       estado = "listo";
     } catch (error) {
       console.error("No se pudieron cargar los tutores:", error);
@@ -167,6 +204,7 @@
 
     const orden = fOrden.value;
     if (orden === "tarifa") return lista.sort((a, b) => a.tarifa - b.tarifa);
+    if (orden === "calificacion") return lista.sort((a, b) => b.promedio - a.promedio);
     if (orden === "nombre") return lista.sort((a, b) => a.name.localeCompare(b.name, "es"));
     // Por defecto: quien tiene el horario más próximo primero
     const proximo = (t) => t.disponibilidad.length
@@ -182,11 +220,17 @@
     return n === 1 ? "1 horario disponible" : `${n} horarios disponibles`;
   }
 
+  function textoCalificacion(t) {
+    return t.opiniones
+      ? `★ ${t.promedio.toFixed(1)} (${t.opiniones} ${t.opiniones === 1 ? "opinión" : "opiniones"})`
+      : "Sin calificaciones aún";
+  }
+
   function tarjeta(t) {
     const prox = t.disponibilidad[0];
     return `
       <article class="pub-card ${t.tone}">
-        <div class="pub-cover">${avatar(t.name, 104)}</div>
+        <div class="pub-cover">${avatar(t.name, 104, t.foto)}</div>
         <div class="pub-body">
           <p class="pub-subject">${escapeHTML(t.subject)}</p>
           <h2>${escapeHTML(t.name)}</h2>
@@ -196,6 +240,7 @@
             <li>${icono("pin")}${escapeHTML(t.lugar)}</li>
             ${prox ? `<li>${icono("clock")}Próximo: ${escapeHTML(fechaLegible(prox.fecha))} · ${escapeHTML(prox.horaInicio)}</li>` : ""}
           </ul>
+          <p class="pub-score">${escapeHTML(textoCalificacion(t))}</p>
           <div class="pub-rating">
             <span class="pub-availability">${escapeHTML(textoDisponibilidad(t))}</span>
             ${t.tarifa ? `<small>$${t.tarifa.toLocaleString("es-CO")}/hora</small>` : ""}
@@ -278,11 +323,11 @@
     tutorEnDialogo = tutor;
     dialog.className = `pub-dialog ${tutor.tone}`;
 
-    $("#pd-avatar").innerHTML = avatar(tutor.name, 104);
+    $("#pd-avatar").innerHTML = avatar(tutor.name, 104, tutor.foto);
     $("#pd-subject").textContent = tutor.subject;
     $("#pd-name").textContent = tutor.name;
     $("#pd-rating").textContent =
-      `${textoDisponibilidad(tutor)}${tutor.tarifa ? ` · $${tutor.tarifa.toLocaleString("es-CO")}/hora` : ""}`;
+      `${textoCalificacion(tutor)} · ${textoDisponibilidad(tutor)}${tutor.tarifa ? ` · $${tutor.tarifa.toLocaleString("es-CO")}/hora` : ""}`;
     $("#pd-bio").textContent = tutor.bio;
 
     const bloques = tutor.disponibilidad.slice(0, 5).map((b) =>

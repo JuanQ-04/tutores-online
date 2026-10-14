@@ -1,12 +1,14 @@
 // js/estudiante.js — Panel del estudiante
 // Requiere: <script type="module" src="../js/estudiante.js"></script>
-// Perfil, Inicio, Mis tutorías, Notificaciones, Buscar tutores y Reservar:
-// conectados a Firestore. Seguridad y Centro de ayuda: siguen como demostración.
+// Perfil, Inicio, Mis tutorías, Notificaciones, Buscar tutores, Reservar y
+// Calificaciones: conectados a Firestore. Seguridad y Centro de ayuda los maneja
+// js/configuracion.js (compartido con el tutor y el administrador).
 
 import { auth, db } from "./firebase-config.js";
 import {
   doc,
   getDoc,
+  setDoc,
   updateDoc,
   collection,
   query,
@@ -18,6 +20,13 @@ import {
 import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import {
+  pintarAvatar,
+  estiloFoto,
+  textoSinFoto,
+  activarSelectorFoto,
+  guardarFotoPerfil
+} from "./foto-perfil.js";
 
 /* ================================================================
    0. Utilidades globales
@@ -151,11 +160,14 @@ function botonReintentar(que) {
    Estado global del módulo
    ================================================================ */
 let estudianteUid   = null;
-let profile         = { name: "", lastname: "", email: "" };
+let profile         = { name: "", lastname: "", email: "", fotoURL: "" };
 let enviandoSolicitud = false; // evita enviar la misma solicitud dos veces
 let solicitudesData = [];   // docs de "solicitudes" del estudiante
 let tutoriasData    = [];   // docs de "tutorias" del estudiante
 let tutoresData     = [];   // docs de "usuarios" (tutores aprobados)
+let misCalificaciones = {}; // tutoriaId → calificación que dio este estudiante
+let resumenCalif    = {};   // tutorId → { promedio, total, comentarios[] } (solo visibles)
+let enviandoCalif   = false;
 let selectedSession = null; // { id, tipo: "solicitud"|"tutoria" }
 let reservaTutor    = null; // tutor elegido para reservar
 let reservaBloque   = null; // bloque de disponibilidad seleccionado
@@ -182,7 +194,7 @@ let doRefreshTutores   = null;
   const titles = {
     inicio: "Inicio", buscar: "Buscar tutores", tutorias: "Mis tutorías",
     notificaciones: "Notificaciones", perfil: "Mi perfil",
-    "detalle-tutoria": "Detalle de tutoría", seguridad: "Seguridad",
+    "detalle-tutoria": "Detalle de tutoría", seguridad: "Configuración",
     ayuda: "Centro de ayuda", reservar: "Reservar tutoría"
   };
 
@@ -331,12 +343,12 @@ function aplicarPerfil() {
 
   const formAvatar = $(".profile-avatar", $("#profile-form"));
   const formName   = $(".profile-name",   $("#profile-form"));
-  if (formAvatar) formAvatar.textContent = avatarText;
+  pintarAvatar(formAvatar, profile.fotoURL, avatarText);
   if (formName)   formName.textContent   = fullName || "Estudiante";
 
   const topAvatar = $(".user-avatar");
   if (topAvatar) {
-    topAvatar.textContent = avatarText;
+    pintarAvatar(topAvatar, profile.fotoURL, avatarText);
     topAvatar.setAttribute("aria-label", fullName ? `Mi perfil, ${fullName}` : "Mi perfil");
   }
 
@@ -357,7 +369,8 @@ async function cargarPerfil(uid) {
     profile = {
       name:     d.nombre   || "",
       lastname: d.apellido || "",
-      email:    d.email    || auth.currentUser?.email || ""
+      email:    d.email    || auth.currentUser?.email || "",
+      fotoURL:  d.fotoURL  || ""
     };
     aplicarPerfil();
     if (nota) nota.textContent = "Tu perfil se carga desde tu cuenta.";
@@ -415,6 +428,24 @@ async function cargarPerfil(uid) {
   }
 }
 
+// Cambiar foto de perfil
+activarSelectorFoto(
+  $(".profile-photo-edit"),
+  async (url) => {
+    await guardarFotoPerfil(url);
+    profile.fotoURL = url;
+    aplicarPerfil();
+    const nota = $("#profile-note");
+    if (nota) nota.textContent = "Foto de perfil actualizada.";
+    showDemoToast("Foto de perfil actualizada.");
+  },
+  (mensaje) => {
+    const nota = $("#profile-note");
+    if (nota) nota.textContent = mensaje;
+    showDemoToast(mensaje);
+  }
+);
+
 /* ================================================================
    4. Mis tutorías — normalización y carga (Firestore)
    ================================================================ */
@@ -445,13 +476,19 @@ function normalizarSolicitud(raw) {
   };
 }
 
+// Las tutorías viejas no guardaban "tutorNombre": se busca entre los tutores cargados.
+function nombreTutorPorId(tutorId) {
+  const t = tutoresData.find((x) => x.id === tutorId);
+  return t ? nombreDe(t) : "";
+}
+
 function normalizarTutoria(raw) {
   const status = raw.estado === "programada"  ? "upcoming"
                : raw.estado === "completada"  ? "completed"
                : "cancelled";
   return {
     id: raw.id, tipo: "tutoria",
-    tutor:   raw.tutorNombre  || "Tutor",
+    tutor:   raw.tutorNombre  || nombreTutorPorId(raw.tutorId) || "Tutor",
     tutorId: raw.tutorId      || "",
     subject: raw.materia      || "Materia",
     date:    tsToISO(raw.fecha),
@@ -479,6 +516,22 @@ async function cargarTutorias(uid) {
     tutoriasEstado = "error";
     tutoriasError  = err;
   }
+  await cargarMisCalificaciones(uid);
+}
+
+/* Calificaciones que este estudiante ya dio. Si falla (p. ej. reglas sin
+   actualizar) no rompe Mis tutorías: solo no se muestran. */
+async function cargarMisCalificaciones(uid) {
+  try {
+    const snap = await conTimeout(getDocs(query(
+      collection(db, "calificaciones"),
+      where("estudianteId", "==", uid)
+    )));
+    misCalificaciones = {};
+    snap.docs.forEach((d) => { misCalificaciones[d.id] = { id: d.id, ...d.data() }; });
+  } catch (err) {
+    console.warn("No se pudieron cargar tus calificaciones:", err);
+  }
 }
 
 function getItemsByTab(tab) {
@@ -498,10 +551,29 @@ function getItemsByTab(tab) {
   ];
 }
 
+function estrellasTexto(n) {
+  const v = Math.round(Number(n) || 0);
+  return "★".repeat(v) + "☆".repeat(5 - v);
+}
+
+function insigniaCalificacion(tutoriaId) {
+  const c = misCalificaciones[tutoriaId];
+  return c
+    ? `<span class="rating-badge" aria-label="Calificaste con ${c.estrellas} de 5">${estrellasTexto(c.estrellas)}</span>`
+    : `<span class="rating-badge is-pending">Por calificar</span>`;
+}
+
+// Foto del tutor a partir de la lista de tutores ya cargada
+function fotoDeTutor(tutorId) {
+  const t = tutoresData.find((x) => x.id === tutorId);
+  return t ? t.fotoURL || "" : "";
+}
+
 function sessionHtml(item) {
   const estado     = ESTADO_LABEL[item.status];
   const modeIcon   = item.mode === "Presencial" ? "pin" : "video";
   const avatarText = ((item.tutor[0] || "T")).toUpperCase();
+  const foto       = fotoDeTutor(item.tutorId);
   return `
     <button class="session-item" type="button"
       data-session-id="${escapeHTML(item.id)}"
@@ -511,8 +583,8 @@ function sessionHtml(item) {
           width:50px;height:50px;border-radius:50%;
           background:var(--color-primary,#6366f1);color:#fff;
           display:flex;align-items:center;justify-content:center;
-          font-weight:700;font-size:1rem;flex-shrink:0"
-          aria-hidden="true">${escapeHTML(avatarText)}</div>
+          font-weight:700;font-size:1rem;flex-shrink:0;${estiloFoto(foto)}"
+          aria-hidden="true">${escapeHTML(textoSinFoto(foto, avatarText))}</div>
         <div class="session-details">
           <p class="session-subject">${escapeHTML(item.subject)}</p>
           <h3 class="session-title">Sesión con ${escapeHTML(item.tutor)}</h3>
@@ -525,6 +597,7 @@ function sessionHtml(item) {
       </div>
       <div class="session-status-side">
         <span class="status-tag ${estado.clase}">${estado.texto}</span>
+        ${item.status === "completed" ? insigniaCalificacion(item.id) : ""}
         ${svgIcon("arrow-right")}
       </div>
     </button>`;
@@ -657,7 +730,116 @@ function renderDetail() {
 
   const cancelBtn = qs("detail-cancel");
   if (cancelBtn) cancelBtn.hidden = !cancelable;
+
+  renderCalificacionDetalle(item);
 }
+
+/* ================================================================
+   6b. Calificar una tutoría completada (Firestore: calificaciones)
+   ================================================================ */
+function renderCalificacionDetalle(item) {
+  const box = $("#detail-rating");
+  if (!box) return;
+
+  if (item.tipo !== "tutoria" || item.status !== "completed") {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+
+  box.hidden = false;
+  const ya = misCalificaciones[item.id];
+
+  if (ya) {
+    box.innerHTML = `
+      <h2 class="profile-name">Tu calificación</h2>
+      <p class="rating-readonly" aria-label="${ya.estrellas} de 5 estrellas">${estrellasTexto(ya.estrellas)}</p>
+      ${ya.comentario ? `<p class="profile-description">"${escapeHTML(ya.comentario)}"</p>` : ""}
+      ${ya.estado === "oculta"
+        ? '<p class="demo-notice">El equipo de TutoresOn-Line ocultó este comentario del perfil público del tutor.</p>'
+        : '<p class="profile-description">Gracias: tu opinión ayuda a otros estudiantes a elegir tutor.</p>'}`;
+    return;
+  }
+
+  const estrellas = [5, 4, 3, 2, 1].map((n) => `
+    <input type="radio" id="calif-${n}" name="estrellas" value="${n}">
+    <label for="calif-${n}" title="${n} de 5">★<span class="sr-only">${n} ${n === 1 ? "estrella" : "estrellas"}</span></label>`).join("");
+
+  box.innerHTML = `
+    <form id="rating-form" novalidate>
+      <h2 class="profile-name">¿Cómo te fue con ${escapeHTML(item.tutor)}?</h2>
+      <p class="profile-description">Califica la tutoría de 1 a 5 estrellas. Solo puedes calificarla una vez.</p>
+      <fieldset class="rating-input">
+        <legend class="sr-only">Calificación</legend>
+        ${estrellas}
+      </fieldset>
+      <label class="profile-field profile-field-full">
+        <span>Comentario (opcional)</span>
+        <textarea id="rating-comment" rows="3" maxlength="400" placeholder="¿Qué fue lo que más te ayudó?"></textarea>
+      </label>
+      <p class="demo-notice" id="rating-note" role="status" aria-live="polite"></p>
+      <button class="primary-button filter-submit" type="submit"><span>Enviar calificación</span></button>
+    </form>`;
+}
+
+document.addEventListener("submit", async (event) => {
+  if (event.target.id !== "rating-form") return;
+  event.preventDefault();
+  if (enviandoCalif || !selectedSession || !estudianteUid) return;
+
+  const form  = event.target;
+  const note  = $("#rating-note", form);
+  const valor = Number(form.elements.estrellas?.value || 0);
+  const comentario = ($("#rating-comment", form)?.value || "").trim();
+  const raw   = tutoriasData.find((t) => t.id === selectedSession.id);
+
+  if (!raw || raw.estado !== "completada") return;
+  if (valor < 1 || valor > 5) {
+    if (note) note.textContent = "Elige de 1 a 5 estrellas.";
+    return;
+  }
+
+  const item = normalizarTutoria(raw);
+  const datos = {
+    tutoriaId:        raw.id,
+    tutorId:          raw.tutorId,
+    tutorNombre:      item.tutor,
+    estudianteId:     estudianteUid,
+    estudianteNombre: `${profile.name} ${profile.lastname}`.trim() || "Estudiante",
+    materia:          item.subject,
+    fechaTutoria:     item.date,
+    estrellas:        valor,
+    comentario,
+    estado:           "visible",
+    retroalimentacion: "",
+    creadaEn:         serverTimestamp()
+  };
+
+  enviandoCalif = true;
+  const boton = $("button[type=submit]", form);
+  if (boton) boton.disabled = true;
+  if (note) note.textContent = "Enviando…";
+
+  try {
+    // El id del documento es el de la tutoría: así no se puede calificar dos veces.
+    await setDoc(doc(db, "calificaciones", raw.id), datos);
+    misCalificaciones[raw.id] = { id: raw.id, ...datos };
+    refrescarVistas();
+    renderDetail();
+    cargarResumenCalificaciones().then(() => doRefreshTutores?.());
+    showDemoToast("¡Gracias! Tu calificación quedó guardada.");
+  } catch (err) {
+    console.error("Error al calificar:", err);
+    if (note) {
+      note.textContent = err?.code === "permission-denied"
+        ? "No se pudo guardar: esta tutoría ya fue calificada o las reglas de Firestore no lo permiten."
+        : "No se pudo guardar la calificación. Revisa tu conexión.";
+    }
+    if (boton) boton.disabled = false;
+  } finally {
+    enviandoCalif = false;
+  }
+});
 
 {
   const detail       = $("#detalle-tutoria");
@@ -748,6 +930,7 @@ async function cargarTutores() {
         .sort((a, b) => `${a.fecha}T${a.horaInicio}`.localeCompare(`${b.fecha}T${b.horaInicio}`));
       return { id: d.id, ...data, disponibilidad };
     });
+    await cargarResumenCalificaciones();
     tutoresEstado = "listo";
     if (!tutoresData.length) {
       console.info(
@@ -761,6 +944,46 @@ async function cargarTutores() {
     tutoresEstado = "error";
     tutoresError  = err;
   }
+}
+
+/* Promedio de cada tutor a partir de las calificaciones visibles. */
+async function cargarResumenCalificaciones() {
+  try {
+    const snap = await conTimeout(getDocs(query(
+      collection(db, "calificaciones"),
+      where("estado", "==", "visible")
+    )));
+    const mapa = {};
+    snap.docs.forEach((d) => {
+      const c = d.data();
+      if (!c.tutorId) return;
+      const r = mapa[c.tutorId] || (mapa[c.tutorId] = { suma: 0, total: 0, comentarios: [] });
+      r.suma  += Number(c.estrellas) || 0;
+      r.total += 1;
+      if (c.comentario) {
+        r.comentarios.push({
+          texto: c.comentario,
+          estrellas: c.estrellas,
+          autor: String(c.estudianteNombre || "Estudiante").split(" ")[0],
+          ts: c.creadaEn?.toMillis?.() ?? 0
+        });
+      }
+    });
+    Object.values(mapa).forEach((r) => {
+      r.promedio = r.total ? r.suma / r.total : 0;
+      r.comentarios.sort((a, b) => b.ts - a.ts);
+    });
+    resumenCalif = mapa;
+  } catch (err) {
+    console.warn("No se pudieron cargar las calificaciones de los tutores:", err);
+    resumenCalif = {};
+  }
+}
+
+function textoCalificacion(tutorId) {
+  const r = resumenCalif[tutorId];
+  if (!r || !r.total) return "Sin calificaciones aún";
+  return `★ ${r.promedio.toFixed(1)} (${r.total} ${r.total === 1 ? "opinión" : "opiniones"})`;
 }
 
 const TONES = ["tone-green", "tone-blue", "tone-sand"];
@@ -782,8 +1005,8 @@ function tutorCardHtml(tutor, index) {
       <div class="tutor-cover" style="display:flex;align-items:center;justify-content:center;background:var(--color-surface-alt,#f1f5f9);min-height:104px">
         <div style="width:80px;height:80px;border-radius:50%;background:var(--color-primary,#6366f1);
           color:#fff;display:flex;align-items:center;justify-content:center;
-          font-size:1.75rem;font-weight:700" aria-hidden="true">
-          ${escapeHTML(inits)}
+          font-size:1.75rem;font-weight:700;${estiloFoto(tutor.fotoURL)}" aria-hidden="true">
+          ${escapeHTML(textoSinFoto(tutor.fotoURL, inits))}
         </div>
         <button class="favorite-button" type="button" aria-label="Guardar a ${escapeHTML(nombre)}">
           ${svgIcon("heart")}
@@ -803,6 +1026,7 @@ function tutorCardHtml(tutor, index) {
           <li>${svgIcon("pin")}${escapeHTML(tutor.ciudad || "Colombia")}</li>
           ${proximo ? `<li>${svgIcon("clock")}Próximo: ${escapeHTML(formatDate(proximo.fecha))} · ${escapeHTML(timeLabel(proximo.horaInicio))}</li>` : ""}
         </ul>
+        <p class="tutor-score">${escapeHTML(textoCalificacion(tutor.id))}</p>
         <div class="tutor-rating">
           <span class="availability">${escapeHTML(availText)}</span>
           ${tutor.tarifa
@@ -887,7 +1111,10 @@ function tutorCardHtml(tutor, index) {
         return matchText && matchSubject && matchMod;
       });
 
-      if (order === "Disponibilidad") {
+      if (order === "Calificacion") {
+        const prom = (t) => resumenCalif[t.id]?.promedio || 0;
+        filtered.sort((a, b) => prom(b) - prom(a) || nombreDe(a).localeCompare(nombreDe(b), "es"));
+      } else if (order === "Disponibilidad") {
         filtered.sort((a, b) => (b.disponibilidad?.length || 0) - (a.disponibilidad?.length || 0));
       } else {
         filtered.sort((a, b) => nombreDe(a).localeCompare(nombreDe(b), "es"));
@@ -937,6 +1164,8 @@ function buildTutorDialog() {
       <p class="tp-location" id="tp-location" style="color:var(--color-text-muted,#64748b);font-size:.875rem"></p>
       <p class="tp-bio"    id="tp-bio"   style="margin:.75rem 0"></p>
       <p class="tp-rate"   id="tp-rate"  style="font-weight:600"></p>
+      <p class="tutor-score" id="tp-score"></p>
+      <div id="tp-reviews"></div>
       <div class="tp-schedule" id="tp-schedule" style="margin:.75rem 0"></div>
       <div class="tp-actions" style="display:flex;gap:.75rem;margin-top:1rem;flex-wrap:wrap">
         <button id="tp-reserve-btn" class="solid-button" type="button">
@@ -964,7 +1193,7 @@ function openTutorProfile(tutorId) {
   const materias = materiasDe(tutor).join(", ") || "General";
   const disps   = Array.isArray(tutor.disponibilidad) ? tutor.disponibilidad : [];
 
-  $("#tp-initials", dialog).textContent   = inits;
+  pintarAvatar($("#tp-initials", dialog), tutor.fotoURL, inits);
   $("#tp-subject",  dialog).textContent   = materias;
   $("#tp-title",    dialog).textContent   = nombre;
   $("#tp-location", dialog).textContent   =
@@ -972,6 +1201,14 @@ function openTutorProfile(tutorId) {
   $("#tp-bio",      dialog).textContent   = tutor.presentacion || "";
   $("#tp-rate",     dialog).textContent   = tutor.tarifa
     ? `Tarifa: $${Number(tutor.tarifa).toLocaleString("es-CO")}/hora` : "";
+
+  $("#tp-score", dialog).textContent = textoCalificacion(tutor.id);
+  const resumen = resumenCalif[tutor.id];
+  $("#tp-reviews", dialog).innerHTML = resumen?.comentarios?.length
+    ? `<ul class="tp-review-list">${resumen.comentarios.slice(0, 3).map((c) => `
+        <li><span class="rating-readonly is-small">${estrellasTexto(c.estrellas)}</span>
+        <p>"${escapeHTML(c.texto)}"</p><small>— ${escapeHTML(c.autor)}</small></li>`).join("")}</ul>`
+    : "";
 
   const schedEl = $("#tp-schedule", dialog);
   if (disps.length > 0) {
@@ -1286,45 +1523,8 @@ function iniciarReserva(tutor) {
 }
 
 /* ================================================================
-   11. Seguridad (demostración)
+   11–12. Seguridad y Centro de ayuda → js/configuracion.js
    ================================================================ */
-{
-  const form = $("#security-form");
-  const note = $("#security-note");
-  if (form) {
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const { actual, nueva, confirmar } = form.elements;
-      let msg = "";
-      if (!actual?.value) msg = "Escribe tu contraseña actual.";
-      else if ((nueva?.value || "").length < 8) msg = "La nueva contraseña debe tener al menos 8 caracteres.";
-      else if (nueva?.value !== confirmar?.value) msg = "Las contraseñas nuevas no coinciden.";
-      if (msg) { if (note) note.textContent = msg; return; }
-      form.reset();
-      if (note) note.textContent = "Vista de demostración: la contraseña no se cambia.";
-      showDemoToast("Contraseña actualizada (demostración).");
-    });
-  }
-}
-
-/* ================================================================
-   12. Centro de ayuda / Contacto (demostración)
-   ================================================================ */
-{
-  const form = $("#contact-form");
-  if (form) {
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const { asunto, mensaje } = form.elements;
-      if (!asunto?.value.trim() || !mensaje?.value.trim()) {
-        showDemoToast("Completa el asunto y el mensaje.");
-        return;
-      }
-      form.reset();
-      showDemoToast("Mensaje enviado al equipo (demostración).");
-    });
-  }
-}
 
 /* ================================================================
    13. Inicio y notificaciones (datos reales de Firestore)
@@ -1404,7 +1604,7 @@ function renderInicio() {
               <li>${svgIcon(virtual ? "video" : "pin")}<span>${virtual ? "Sesión virtual" : "Sesión presencial"}</span></li>
             </ul>
           </div>
-          <div class="tutor-avatar" aria-label="Iniciales de ${escapeHTML(next.tutor)}">${escapeHTML(iniciales(next.tutor, "T"))}</div>
+          <div class="tutor-avatar" style="${estiloFoto(fotoDeTutor(next.tutorId))}" aria-label="Iniciales de ${escapeHTML(next.tutor)}">${escapeHTML(textoSinFoto(fotoDeTutor(next.tutorId), iniciales(next.tutor, "T")))}</div>
         </div>
         <p class="lesson-reminder">El enlace de la sesión estará disponible 15 minutos antes.</p>
         <a class="card-action" href="#detalle-tutoria" data-abrir-sesion="${escapeHTML(next.id)}" data-sesion-tipo="tutoria">
@@ -1505,7 +1705,7 @@ function renderInicio() {
             const n      = t.disponibilidad.length;
             return `
               <article class="recommendation-card">
-                <div class="recommendation-avatar" aria-hidden="true">${escapeHTML(iniciales(nombre, "T"))}</div>
+                <div class="recommendation-avatar" style="${estiloFoto(t.fotoURL)}" aria-hidden="true">${escapeHTML(textoSinFoto(t.fotoURL, iniciales(nombre, "T")))}</div>
                 <div class="recommendation-information">
                   <p class="recommendation-subject">${escapeHTML(materiasDe(t)[0] || "General")}</p>
                   <h3>${escapeHTML(nombre)}</h3>
@@ -1566,7 +1766,9 @@ function construirNotificaciones() {
     const cuando = `${formatDate(t.date)}, ${timeLabel(t.start)}`;
     const textos = {
       programada: ["Tutoría confirmada", `Tu sesión con ${t.tutor} está confirmada para ${cuando}.`],
-      completada: ["Tutoría completada", `Tu sesión con ${t.tutor} figura como completada.`],
+      completada: ["Tutoría completada", misCalificaciones[raw.id]
+        ? `Tu sesión con ${t.tutor} figura como completada.`
+        : `Tu sesión con ${t.tutor} figura como completada. ¡Califícala desde Mis tutorías!`],
       cancelada:  ["Tutoría cancelada",  `Tu sesión con ${t.tutor} (${cuando}) fue cancelada.`]
     }[raw.estado];
     if (textos) {
