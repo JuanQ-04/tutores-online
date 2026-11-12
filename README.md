@@ -7,6 +7,9 @@ Proyecto final del curso, con metodología ágil (Scrum).
 
 - **Frontend:** HTML, CSS y JavaScript (módulos ES), sin bundler.
 - **Autenticación y base de datos:** Firebase Authentication + Cloud Firestore (SDK modular por CDN).
+- **Backend:** API REST en Node.js + Express (carpeta `backend/`) con Firebase Admin SDK. Se encarga de las reservas
+  (sin choques de horario), la búsqueda de tutores, las calificaciones, el correo y la videollamada con Jitsi Meet.
+  Documentación interactiva en `/api/docs`. Ver `backend/README.md`.
 - **Despliegue:** Azure Static Web Apps, con despliegue automático desde GitHub Actions.
 
 ## Roles
@@ -38,6 +41,18 @@ Los módulos ES no funcionan abriendo el archivo directamente; usa un servidor l
 npx serve .
 # o con la extensión Live Server de VS Code
 ```
+
+Para que reservar, aceptar, calificar y buscar funcionen, también debe estar corriendo el backend
+(en otra terminal):
+
+```bash
+cd backend
+npm install        # solo la primera vez
+npm run dev        # http://localhost:4000
+```
+
+El frontend detecta `localhost` y usa `http://localhost:4000/api` (ver `js/api.js`). Al desplegar,
+cambia `API_URL` en ese archivo por la URL real del backend.
 
 `localhost` ya debe estar en los dominios autorizados de Firebase Authentication.
 

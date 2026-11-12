@@ -8,14 +8,11 @@ import { auth, db } from "./firebase-config.js";
 import {
   doc,
   getDoc,
-  setDoc,
   updateDoc,
   collection,
   query,
   where,
-  getDocs,
-  addDoc,
-  serverTimestamp
+  getDocs
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import {
   onAuthStateChanged
@@ -27,6 +24,7 @@ import {
   activarSelectorFoto,
   guardarFotoPerfil
 } from "./foto-perfil.js";
+import { api } from "./api.js";
 
 /* ================================================================
    0. Utilidades globales
@@ -497,7 +495,8 @@ function normalizarTutoria(raw) {
     mode:    raw.modalidad    || "Virtual",
     status,
     message: raw.comentario   || "",
-    tarifa:  raw.tarifa       || 0
+    tarifa:  raw.tarifa       || 0,
+    link:    raw.enlaceReunion || ""
   };
 }
 
@@ -719,10 +718,20 @@ function renderDetail() {
     ].join("");
   }
 
+  // Videollamada (Jitsi): solo tutorías programadas, virtuales, con enlace https.
+  const joinEl = qs("detail-join");
+  if (joinEl) {
+    const hayEnlace = item.tipo === "tutoria" && item.status === "upcoming" &&
+      typeof item.link === "string" && item.link.startsWith("https://");
+    joinEl.hidden = !hayEnlace;
+    if (hayEnlace) joinEl.href = item.link;
+  }
+
   const noteEl = qs("detail-note");
   if (noteEl) {
     noteEl.textContent = item.status === "upcoming"
-      ? "El enlace de la videoconferencia se habilita 15 minutos antes del inicio."
+      ? (item.link ? "Entra a la videollamada con el botón cuando llegue la hora de la tutoría."
+                   : "Esta tutoría es presencial: coordina el punto de encuentro con tu tutor.")
       : item.status === "pending"
       ? "Esperando la respuesta del tutor."
       : "Esta tutoría ya no se puede modificar.";
@@ -799,42 +808,22 @@ document.addEventListener("submit", async (event) => {
     return;
   }
 
-  const item = normalizarTutoria(raw);
-  const datos = {
-    tutoriaId:        raw.id,
-    tutorId:          raw.tutorId,
-    tutorNombre:      item.tutor,
-    estudianteId:     estudianteUid,
-    estudianteNombre: `${profile.name} ${profile.lastname}`.trim() || "Estudiante",
-    materia:          item.subject,
-    fechaTutoria:     item.date,
-    estrellas:        valor,
-    comentario,
-    estado:           "visible",
-    retroalimentacion: "",
-    creadaEn:         serverTimestamp()
-  };
-
   enviandoCalif = true;
   const boton = $("button[type=submit]", form);
   if (boton) boton.disabled = true;
   if (note) note.textContent = "Enviando…";
 
   try {
-    // El id del documento es el de la tutoría: así no se puede calificar dos veces.
-    await setDoc(doc(db, "calificaciones", raw.id), datos);
-    misCalificaciones[raw.id] = { id: raw.id, ...datos };
+    // La API valida que la tutoría esté completada, sea tuya y no tenga ya calificación.
+    const creada = await api.calificar({ tutoriaId: raw.id, estrellas: valor, comentario });
+    misCalificaciones[raw.id] = { id: raw.id, ...creada };
     refrescarVistas();
     renderDetail();
     cargarResumenCalificaciones().then(() => doRefreshTutores?.());
     showDemoToast("¡Gracias! Tu calificación quedó guardada.");
   } catch (err) {
     console.error("Error al calificar:", err);
-    if (note) {
-      note.textContent = err?.code === "permission-denied"
-        ? "No se pudo guardar: esta tutoría ya fue calificada o las reglas de Firestore no lo permiten."
-        : "No se pudo guardar la calificación. Revisa tu conexión.";
-    }
+    if (note) note.textContent = err?.message || "No se pudo guardar la calificación. Revisa tu conexión.";
     if (boton) boton.disabled = false;
   } finally {
     enviandoCalif = false;
@@ -879,11 +868,11 @@ document.addEventListener("submit", async (event) => {
         cancelDialog.close();
         try {
           if (selectedSession.tipo === "solicitud") {
-            await updateDoc(doc(db, "solicitudes", selectedSession.id), { estado: "rechazada" });
+            await api.cancelarSolicitud(selectedSession.id);
             const idx = solicitudesData.findIndex((s) => s.id === selectedSession.id);
             if (idx >= 0) solicitudesData[idx].estado = "rechazada";
           } else {
-            await updateDoc(doc(db, "tutorias", selectedSession.id), { estado: "cancelada" });
+            await api.cancelarTutoria(selectedSession.id);
             const idx = tutoriasData.findIndex((t) => t.id === selectedSession.id);
             if (idx >= 0) tutoriasData[idx].estado = "cancelada";
           }
@@ -892,7 +881,7 @@ document.addEventListener("submit", async (event) => {
           showDemoToast("Tutoría cancelada.");
         } catch (err) {
           console.error("Error al cancelar:", err);
-          showDemoToast("No se pudo cancelar. Revisa tu conexión.");
+          showDemoToast(err?.message || "No se pudo cancelar. Revisa tu conexión.");
         }
       });
     }
@@ -912,29 +901,14 @@ async function cargarTutores() {
   tutoresEstado = "cargando";
   tutoresError  = null;
   try {
-    const ahora = new Date();
-    const hoy   = dateISO(ahora);
-    const hora  = horaISO(ahora);
-    const q = query(
-      collection(db, "usuarios"),
-      where("rol",    "==", "tutor"),
-      where("estado", "in", ["aprobado", "aceptado"])
-    );
-    const snap = await conTimeout(getDocs(q));
-    tutoresData = snap.docs.filter((d) => d.data().activo !== false).map((d) => {
-      const data = d.data();
-      // Solo bloques que todavía no pasaron, del más próximo al más lejano
-      const disponibilidad = (Array.isArray(data.disponibilidad) ? data.disponibilidad : [])
-        .filter((b) => b && b.fecha &&
-          (b.fecha > hoy || (b.fecha === hoy && (b.horaFin || "23:59") > hora)))
-        .sort((a, b) => `${a.fecha}T${a.horaInicio}`.localeCompare(`${b.fecha}T${b.horaInicio}`));
-      return { id: d.id, ...data, disponibilidad };
-    });
+    // La API devuelve solo tutores aprobados, con horarios futuros y sin choques.
+    const { tutores } = await conTimeout(api.buscarTutores({ limite: 100 }));
+    tutoresData = tutores;
     await cargarResumenCalificaciones();
     tutoresEstado = "listo";
     if (!tutoresData.length) {
       console.info(
-        "[Buscar tutores] La consulta funcionó pero no devolvió tutores. En Firestore → usuarios, " +
+        "[Buscar tutores] La API respondió pero no devolvió tutores. En Firestore → usuarios, " +
         "un tutor solo aparece si tiene rol = \"tutor\" y estado = \"aprobado\" o \"aceptado\" (exactamente así, en minúsculas)."
       );
     }
@@ -1446,9 +1420,7 @@ function iniciarReserva(tutor) {
         }
 
         const mensaje = ($("#reserva-mensaje", sec)?.value || "").trim();
-        const nombre  = nombreDe(reservaTutor);
         const materia = materiaParaReserva(reservaTutor);
-        const estudNombre = `${profile.name} ${profile.lastname}`.trim() || "Estudiante";
 
         // Protección contra doble envío (doble clic / reintentos)
         if (enviandoSolicitud) return;
@@ -1458,41 +1430,15 @@ function iniciarReserva(tutor) {
           nextBtn.disabled = true;
           if (note) note.textContent = "Enviando solicitud…";
 
-          // ¿Ya existe una solicitud pendiente para este mismo tutor y horario?
-          const previas = await getDocs(query(
-            collection(db, "solicitudes"),
-            where("estudianteId", "==", estudianteUid)
-          ));
-          const yaExiste = previas.docs.some((d) => {
-            const x = d.data();
-            return x.estado === "pendiente" &&
-              x.tutorId === reservaTutor.id &&
-              x.fecha === reservaBloque.fecha &&
-              x.horaInicio === reservaBloque.horaInicio;
-          });
-          if (yaExiste) {
-            await cargarTutorias(estudianteUid);
-            refrescarVistas();
-            if (note) note.textContent = "Ya enviaste una solicitud pendiente para ese horario.";
-            nextBtn.disabled = false;
-            enviandoSolicitud = false;
-            return;
-          }
-
-          await addDoc(collection(db, "solicitudes"), {
-            tutorId:          reservaTutor.id,
-            tutorNombre:      nombre,
-            estudianteId:     estudianteUid,
-            estudianteNombre: estudNombre,
+          // La API valida el horario real del tutor, duplicados, fechas pasadas y la tarifa.
+          await api.crearSolicitud({
+            tutorId:    reservaTutor.id,
             materia,
             fecha:      reservaBloque.fecha,
             horaInicio: reservaBloque.horaInicio,
             horaFin:    reservaBloque.horaFin,
             modalidad:  reservaBloque.modalidad,
-            mensaje,
-            tarifa:     Number(reservaTutor.tarifa) || 0,
-            estado:     "pendiente",
-            creadaEn:   serverTimestamp()
+            mensaje
           });
 
           // Recargar las solicitudes del estudiante y refrescar las pestañas
@@ -1506,7 +1452,11 @@ function iniciarReserva(tutor) {
         } catch (err) {
           console.error("Error al enviar solicitud:", err);
           nextBtn.disabled = false;
-          if (note) note.textContent = "No se pudo enviar la solicitud. Revisa tu conexión.";
+          if (note) note.textContent = err?.message || "No se pudo enviar la solicitud. Revisa tu conexión.";
+          // Si el horario ya no está disponible, se refresca la lista de tutores.
+          if (err?.status === 409) {
+            try { await cargarTutores(); doRefreshTutores?.(); } catch { /* sin cambios */ }
+          }
         } finally {
           enviandoSolicitud = false;
         }

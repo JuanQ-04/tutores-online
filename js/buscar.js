@@ -1,6 +1,6 @@
 // js/buscar.js — Pantalla pública «Tutores disponibles»
 //
-// - Lee de Firestore los tutores aprobados (colección «usuarios») y los muestra
+// - Lee de la API (GET /api/tutores) los tutores aprobados y los muestra
 //   como catálogo. No requiere sesión para ver.
 // - Filtros: texto, materia, fecha y modalidad (según los bloques de
 //   disponibilidad que el tutor publicó).
@@ -19,7 +19,6 @@
     estadistica: "Estadística"
   };
 
-  const ESTADOS_VISIBLES = ["aprobado", "aceptado"];
   const TONES = ["tone-green", "tone-blue", "tone-sand"];
 
   let TUTORES = [];
@@ -95,15 +94,12 @@
       justify-content:center;font-size:${Math.round(size / 2.6)}px;font-weight:700;${estilo}">${escapeHTML(texto)}</div>`;
   }
 
-  /* ---------- Carga desde Firestore ---------- */
+  /* ---------- Carga desde la API ---------- */
   async function cargarTutores() {
     estado = "cargando";
     render();
     try {
-      const { db } = await import("./firebase-config.js");
-      const { collection, query, where, getDocs } = await import(
-        "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"
-      );
+      const { api } = await import("./api.js");
 
       try {
         FOTO = await import("./foto-perfil.js");
@@ -111,62 +107,29 @@
         console.warn("No se pudo cargar el módulo de fotos:", e);
       }
 
-      const snap = await getDocs(query(
-        collection(db, "usuarios"),
-        where("rol", "==", "tutor"),
-        where("estado", "in", ESTADOS_VISIBLES)
-      ));
+      // La API ya entrega solo tutores aprobados, con horarios futuros y libres,
+      // y con el promedio de estrellas calculado.
+      const { tutores } = await api.buscarTutores({ limite: 100 });
 
-      const hoy = hoyISO();
-      const hora = horaActual();
-
-      TUTORES = snap.docs.filter((d) => d.data().activo !== false).map((d, i) => {
-        const data = d.data();
-        // Solo bloques que todavía no pasaron, del más próximo al más lejano
-        const disponibilidad = (Array.isArray(data.disponibilidad) ? data.disponibilidad : [])
-          .filter((b) => b && b.fecha &&
-            (b.fecha > hoy || (b.fecha === hoy && (b.horaFin || "23:59") > hora)))
-          .sort((a, b) => `${a.fecha}T${a.horaInicio}`.localeCompare(`${b.fecha}T${b.horaInicio}`));
-
-        const nombre = `${data.nombre || ""} ${data.apellido || ""}`.trim() || "Tutor";
+      TUTORES = tutores.map((t, i) => {
+        const nombre = `${t.nombre || ""} ${t.apellido || ""}`.trim() || "Tutor";
+        const materias = Array.isArray(t.materias) ? t.materias : [];
         return {
-          id: d.id,
+          id: t.id,
           name: nombre,
-          materias: (Array.isArray(data.materias) ? data.materias : []),
-          subject: (Array.isArray(data.materias) ? data.materias : []).map(materiaLabel).join(", ") || "General",
-          titulo: data.titulo || "Profesional",
-          lugar: data.ciudad || "Colombia",
-          bio: data.presentacion || "Tutor registrado en la plataforma.",
-          tarifa: Number(data.tarifa) || 0,
-          disponibilidad,
-          foto: data.fotoURL || "",
+          materias,
+          subject: materias.map(materiaLabel).join(", ") || "General",
+          titulo: t.titulo || "Profesional",
+          lugar: t.ciudad || "Colombia",
+          bio: t.presentacion || "Tutor registrado en la plataforma.",
+          tarifa: Number(t.tarifa) || 0,
+          disponibilidad: t.disponibilidad,
+          foto: t.fotoURL || "",
           tone: TONES[i % TONES.length],
-          promedio: 0,
-          opiniones: 0
+          promedio: t.promedio || 0,
+          opiniones: t.opiniones || 0
         };
       });
-
-      // Calificaciones visibles → promedio por tutor. Si falla, el catálogo sigue.
-      try {
-        const califSnap = await getDocs(query(
-          collection(db, "calificaciones"),
-          where("estado", "==", "visible")
-        ));
-        const suma = {};
-        califSnap.docs.forEach((d) => {
-          const c = d.data();
-          if (!c.tutorId) return;
-          suma[c.tutorId] = suma[c.tutorId] || { s: 0, n: 0 };
-          suma[c.tutorId].s += Number(c.estrellas) || 0;
-          suma[c.tutorId].n += 1;
-        });
-        TUTORES.forEach((t) => {
-          const r = suma[t.id];
-          if (r && r.n) { t.promedio = r.s / r.n; t.opiniones = r.n; }
-        });
-      } catch (errorCalif) {
-        console.warn("No se pudieron cargar las calificaciones:", errorCalif);
-      }
 
       estado = "listo";
     } catch (error) {

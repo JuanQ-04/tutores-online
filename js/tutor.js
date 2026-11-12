@@ -11,9 +11,7 @@ import {
   collection,
   query,
   where,
-  getDocs,
-  writeBatch,
-  serverTimestamp
+  getDocs
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import {
   onAuthStateChanged
@@ -23,6 +21,7 @@ import {
   activarSelectorFoto,
   guardarFotoPerfil
 } from "./foto-perfil.js";
+import { api } from "./api.js";
 
 (() => {
   "use strict";
@@ -206,7 +205,8 @@ import {
       status: estadoTutoria[raw.estado] || "confirmed",
       isRequest: false,
       message: raw.comentario || "",
-      tarifa: raw.tarifa || 0
+      tarifa: raw.tarifa || 0,
+      link: raw.enlaceReunion || ""
     };
   }
 
@@ -615,6 +615,9 @@ import {
           <dt>Fecha</dt><dd>${escapeHTML(formatDate(t.date))}</dd>
           <dt>Horario</dt><dd>${escapeHTML(timeLabel(t.start))} – ${escapeHTML(timeLabel(t.end))}</dd>
           <dt>Modalidad</dt><dd>${escapeHTML(t.mode)}</dd>
+          ${t.status === "confirmed" && t.link.startsWith("https://")
+            ? `<dt>Videollamada</dt><dd><a href="${escapeHTML(t.link)}" target="_blank" rel="noopener noreferrer">Abrir sala de Jitsi</a></dd>`
+            : ""}
           <dt>Tarifa</dt><dd>$${t.tarifa.toLocaleString("es-CO")} / hora</dd>
           <dt>Estado</dt><dd>${statusLabels[t.status]}</dd>
         </dl>
@@ -1076,53 +1079,13 @@ import {
     const rawSol = solicitudesData.find((s) => s.id === solicitudId);
     if (!rawSol || rawSol.estado !== "pendiente") return;
 
-    // Verificar conflicto con tutorías programadas
-    const sol = normalizarSolicitud(rawSol);
-    const conflicto = tutoriasData
-      .filter((t) => t.estado === "programada")
-      .map(normalizarTutoria)
-      .some((t) => overlaps(sol, t));
-
-    if (conflicto) {
-      showToast("No puedes aceptar: ya tienes una tutoría programada en ese horario.");
-      return;
-    }
-
     try {
-      const batch = writeBatch(db);
+      // La API valida choques de horario y, en una sola transacción, acepta la
+      // solicitud, crea la tutoría (con enlace de Jitsi si es virtual) y envía los correos.
+      await api.aceptarSolicitud(solicitudId);
 
-      // 1. Actualizar solicitud → aceptada
-      batch.update(doc(db, "solicitudes", solicitudId), { estado: "aceptada" });
-
-      // 2. Crear tutoría
-      const tutoriaRef = doc(collection(db, "tutorias"));
-      batch.set(tutoriaRef, {
-        solicitudId,
-        tutorId: rawSol.tutorId,
-        tutorNombre: rawSol.tutorNombre || `${profile.name} ${profile.lastname}`.trim(),
-        estudianteId: rawSol.estudianteId,
-        estudianteNombre: rawSol.estudianteNombre,
-        materia: rawSol.materia,
-        fecha: rawSol.fecha,
-        horaInicio: rawSol.horaInicio,
-        horaFin: rawSol.horaFin,
-        modalidad: rawSol.modalidad,
-        tarifa: rawSol.tarifa || 0,
-        estado: "programada",
-        enlaceReunion: "",
-        calificacion: null,
-        comentario: "",
-        creadaEn: serverTimestamp()
-      });
-
-      await batch.commit();
-
-      // Actualizar estado local
-      const idx = solicitudesData.findIndex((s) => s.id === solicitudId);
-      if (idx >= 0) solicitudesData[idx].estado = "aceptada";
-
-      // Recargar tutorías desde Firestore para tener el id real del nuevo doc
-      await cargarTutorias(tutorUid);
+      // Recargar desde Firestore para tener el estado real y el id de la tutoría nueva
+      await Promise.all([cargarSolicitudes(tutorUid), cargarTutorias(tutorUid)]);
 
       $("#tutor-detail-dialog").close();
       addNotification("Solicitud aceptada", `Aceptaste la solicitud de ${rawSol.estudianteNombre}.`);
@@ -1130,7 +1093,7 @@ import {
       showToast("Solicitud aceptada. La tutoría quedó programada.");
     } catch (err) {
       console.error("Error al aceptar solicitud:", err);
-      showToast("No se pudo aceptar la solicitud. Revisa tu conexión.");
+      showToast(err?.message || "No se pudo aceptar la solicitud. Revisa tu conexión.");
     }
   }
 
@@ -1141,7 +1104,7 @@ import {
     if (!window.confirm(`¿Rechazar la solicitud de ${rawSol.estudianteNombre}?`)) return;
 
     try {
-      await updateDoc(doc(db, "solicitudes", solicitudId), { estado: "rechazada" });
+      await api.rechazarSolicitud(solicitudId);
       const idx = solicitudesData.findIndex((s) => s.id === solicitudId);
       if (idx >= 0) solicitudesData[idx].estado = "rechazada";
 
@@ -1151,7 +1114,7 @@ import {
       showToast("Solicitud rechazada.");
     } catch (err) {
       console.error("Error al rechazar solicitud:", err);
-      showToast("No se pudo rechazar la solicitud. Revisa tu conexión.");
+      showToast(err?.message || "No se pudo rechazar la solicitud. Revisa tu conexión.");
     }
   }
 
@@ -1163,7 +1126,8 @@ import {
     if (!window.confirm(`¿Marcar esta tutoría como ${label}?`)) return;
 
     try {
-      await updateDoc(doc(db, "tutorias", tutoriaId), { estado: nuevoEstado });
+      if (nuevoEstado === "completada") await api.completarTutoria(tutoriaId);
+      else                              await api.cancelarTutoria(tutoriaId);
       const idx = tutoriasData.findIndex((t) => t.id === tutoriaId);
       if (idx >= 0) tutoriasData[idx].estado = nuevoEstado;
 
@@ -1178,7 +1142,7 @@ import {
         : `Tutoría marcada como ${label}.`);
     } catch (err) {
       console.error("Error al actualizar tutoría:", err);
-      showToast("No se pudo actualizar la tutoría. Revisa tu conexión.");
+      showToast(err?.message || "No se pudo actualizar la tutoría. Revisa tu conexión.");
     }
   }
 
