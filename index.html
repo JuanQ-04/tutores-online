@@ -659,14 +659,6 @@
 
   <script src="js/landing.js"></script>
 
-  <script>
-    // Fecha del día en la tarjeta decorativa del hero
-    (function () {
-      var hoy = new Date();
-      var mes = hoy.toLocaleDateString("es-CO", { month: "short" }).replace(".", "").toUpperCase();
-      document.getElementById("hero-cal-mes").textContent = mes;
-      document.getElementById("hero-cal-dia").textContent = hoy.getDate();
-    })();
-  </script>
+  <script src="js/hero-fecha.js"></script>
 </body>
 </html>

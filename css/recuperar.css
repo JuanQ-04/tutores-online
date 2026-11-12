@@ -1,0 +1,15 @@
+/* Aviso de confirmación (verde) para la página de recuperar contraseña.
+   Reutiliza .auth-alert de auth.css y solo cambia los colores. */
+.auth-alert.is-ok {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+/* Pantalla de verificación de correo (pages/verificar.html) */
+.verificar-ayuda {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  text-align: center;
+  margin-top: 4px;
+}

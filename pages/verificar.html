@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verifica tu correo — TutoresOn-Line</title>
+  <link rel="icon" type="image/webp" href="../images/logo.webp">
+
+  <!-- Estilos base y compartidos -->
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/auth.css">
+  <link rel="stylesheet" href="../css/recuperar.css">
+</head>
+<body class="auth-body">
+
+  <!-- Iconos SVG reutilizables -->
+  <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" class="svg-sprite" aria-hidden="true">
+    <defs>
+      <symbol id="icon-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="m12 19-7-7 7-7M5 12h14"></path>
+      </symbol>
+      <symbol id="icon-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M5 12h14M12 5l7 7-7 7"></path>
+      </symbol>
+      <symbol id="icon-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l-2.5-6.5L3 12l6.5-2.5Z"></path>
+      </symbol>
+      <symbol id="icon-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="m8 12 3 3 5-6"></path>
+      </symbol>
+      <symbol id="icon-google" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.51h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.34z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <!-- Barra de navegación simple -->
+  <header class="auth-header">
+    <a href="../index.html" class="brand brand-lockup">
+      <img src="../images/logo.webp" alt="Logo" class="brand-mark" width="28" height="28">
+      <span>Tutores<span>On-Line</span></span>
+    </a>
+    <a href="../index.html" class="auth-back-link">
+      <svg class="icon" width="16" height="16"><use href="#icon-arrow-left"></use></svg>
+      Volver al inicio
+    </a>
+  </header>
+
+  <!-- Contenedor principal dividido en 2 columnas -->
+  <main class="auth-container">
+
+    <!-- Columna izquierda: Ilustración / Banner informativo -->
+    <aside class="auth-banner">
+      <div class="auth-banner-top">
+        <span class="auth-badge-sparkle">
+          <svg class="icon" width="16" height="16"><use href="#icon-sparkles"></use></svg>
+        </span>
+      </div>
+
+      <div class="auth-banner-copy">
+        <span class="auth-kicker">AULA SERENA</span>
+        <h2>Aprender también es sentirte acompañado.</h2>
+        <p>Guarda tus preferencias, encuentra tutores compatibles y retoma tu ritmo cuando quieras.</p>
+        
+        <div class="auth-slider-dots">
+          <span class="dot active"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </div>
+
+      <div class="auth-banner-footer">
+        <svg class="icon" width="18" height="18"><use href="#icon-check-circle"></use></svg>
+        <span>Tu información queda lista para que puedas concentrarte en aprender.</span>
+      </div>
+    </aside>
+
+    <!-- Columna derecha: Verificación de correo -->
+    <section class="auth-card">
+      <div class="auth-card-intro">
+        <span class="eyebrow">CASI LISTO</span>
+        <h1>Verifica tu correo.</h1>
+        <p>Enviamos un enlace de verificación a <strong id="verificar-correo">tu correo</strong>. Ábrelo y vuelve aquí: entrarás automáticamente.</p>
+      </div>
+
+      <!-- Avisos de resultado -->
+      <div id="auth-alert" class="auth-alert" style="display: none;" role="alert"></div>
+      <div id="verificar-ok" class="auth-alert is-ok" style="display: none;" role="status"></div>
+
+      <div class="auth-form">
+        <button type="button" id="btn-ya-verifique" class="button button-primary button-full">
+          <span>Ya verifiqué mi correo</span>
+          <svg class="icon" width="16" height="16"><use href="#icon-arrow-right"></use></svg>
+        </button>
+
+        <button type="button" id="btn-reenviar" class="button button-outline button-full">
+          <span>Reenviar correo</span>
+        </button>
+
+        <p class="verificar-ayuda">¿No llega? Revisa la carpeta de spam o correo no deseado.</p>
+      </div>
+
+      <footer class="auth-card-footer">
+        <span>¿Te equivocaste de correo?</span>
+        <button type="button" class="button button-outline logout-button">Cerrar sesión</button>
+      </footer>
+    </section>
+
+  </main>
+
+  <script type="module" src="../js/verificar.js"></script>
+</body>
+</html>

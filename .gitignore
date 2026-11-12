@@ -1,0 +1,25 @@
+# Secretos y credenciales (NUNCA subir)
+.env
+.env.*
+*.pem
+*.key
+*-adminsdk-*.json
+serviceAccount*.json
+secrets/
+
+# Firebase / Azure locales
+.firebase/
+firebase-debug.log*
+.azure/
+
+# Dependencias y builds
+node_modules/
+dist/
+build/
+
+# Editor / sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

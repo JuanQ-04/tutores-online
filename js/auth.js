@@ -10,6 +10,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut,
+  sendEmailVerification,
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
@@ -107,8 +108,14 @@ window.registrarNuevoUsuario = async function (rol) {
       creadoEn: serverTimestamp()
     });
 
-    // Estudiante → panel; Tutor → completar perfil profesional.
-    window.location.href = rol === "tutor" ? "registro-tutor.html" : "estudiante.html";
+    // Verificación de correo: se envía el enlace y se pasa a la pantalla de
+    // espera. Si el envío falla, igual llegamos ahí: allí se puede reenviar.
+    try {
+      await enviarVerificacion(credencial.user);
+    } catch (errorCorreo) {
+      console.warn("No se pudo enviar el correo de verificación:", errorCorreo.code);
+    }
+    window.location.href = "verificar.html";
   } catch (error) {
     mostrarError(mensajeDeError(error.code));
   }
@@ -181,6 +188,11 @@ async function aplicarPersistencia() {
 let sesionRecienIniciada = false;
 
 async function redirigirAlPanel() {
+  // Cuentas con correo y contraseña deben verificar su correo antes de entrar.
+  if (!auth.currentUser.emailVerified) {
+    window.location.href = "verificar.html";
+    return;
+  }
   let rol = "estudiante";
   let estado = "";
   try {
@@ -333,6 +345,11 @@ onAuthStateChanged(auth, async (usuario) => {
     }
     // Sesión abierta en un panel y el admin suspendió la cuenta: sacarla.
     if (PAGINAS_PROTEGIDAS.includes(paginaActual)) {
+      // Correo sin verificar: no se entra a ningún panel.
+      if (!usuario.emailVerified) {
+        window.location.href = "verificar.html";
+        return;
+      }
       try {
         const snap = await getDoc(doc(db, "usuarios", usuario.uid));
         if (snap.exists() && snap.data().activo === false) {
@@ -349,5 +366,27 @@ onAuthStateChanged(auth, async (usuario) => {
     }
   }
 });
+
+/* ---------------------------------------------------------
+   Verificación de correo (la usan auth.js y js/verificar.js)
+   --------------------------------------------------------- */
+export async function enviarVerificacion(usuario) {
+  auth.languageCode = "es";
+  try {
+    // Tras verificar, el enlace ofrece volver a la pantalla de verificación.
+    await sendEmailVerification(usuario, {
+      url: new URL("verificar.html", window.location.href).href
+    });
+  } catch (error) {
+    if (error.code === "auth/unauthorized-continue-uri") {
+      // Dominio aún no autorizado en Firebase: enviar sin enlace de regreso.
+      await sendEmailVerification(usuario);
+    } else {
+      throw error;
+    }
+  }
+}
+
+export { destinoSegunRol };
 
 console.log("✅ Firebase conectado y autenticación lista");

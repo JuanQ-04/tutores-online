@@ -154,18 +154,7 @@
 
   </main>
 
-  <!-- Lógica de interfaz preliminar (toggle contraseña) -->
-  <script>
-    const toggleBtn = document.getElementById('btn-toggle-password');
-    const pwdInput = document.getElementById('password');
-    if (toggleBtn && pwdInput) {
-      toggleBtn.addEventListener('click', () => {
-        const isPass = pwdInput.type === 'password';
-        pwdInput.type = isPass ? 'text' : 'password';
-        toggleBtn.textContent = isPass ? 'Ocultar' : 'Mostrar';
-      });
-    }
-  </script>
+  <script src="../js/login-toggle.js"></script>
   <script type="module" src="../js/auth.js"></script>
 </body>
 </html>
