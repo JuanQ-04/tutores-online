@@ -19,7 +19,8 @@ import {
   getDocs,
   query,
   where,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 import {
@@ -121,6 +122,7 @@ const ADMIN_SECTIONS = [
 
 /* Datos reales (Firestore) */
 let adminUid = null;
+let cancelarEscuchasAdmin = [];
 let adminProfile = { nombre: "", apellido: "", email: "", fotoURL: "" };
 let ratings = [];            // colección «calificaciones»
 let ratingsEstado = "cargando";
@@ -1038,6 +1040,33 @@ async function loadRatings() {
   renderRatings();
 }
 
+function suscribirDatosAdmin() {
+  cancelarEscuchasAdmin.forEach((cancelar) => cancelar());
+  cancelarEscuchasAdmin = [
+    onSnapshot(collection(db, "tutorias"), (snap) => {
+      statsTutorias = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      statsEstado = "listo";
+      statsError = null;
+      renderAnalytics();
+      renderStats();
+      renderSubjectList();
+      renderActivity();
+    }, (err) => console.warn("No se pudieron sincronizar las tutorías:", err)),
+    onSnapshot(collection(db, "calificaciones"), (snap) => {
+      ratings = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.creadaEn?.toMillis?.() ?? 0) - (a.creadaEn?.toMillis?.() ?? 0));
+      ratingsEstado = "listo";
+      ratingsError = null;
+      populateRatingFilters();
+      renderRatings();
+      renderTutors();
+      renderAnalytics();
+      renderSubjectList();
+      renderActivity();
+    }, (err) => console.warn("No se pudieron sincronizar las calificaciones:", err))
+  ];
+}
+
 function populateRatingFilters() {
   const fill = (select, values) => {
     const current = select.value;
@@ -1460,7 +1489,12 @@ function init() {
 
   // Solo un usuario con rol «admin» puede quedarse en este panel.
   onAuthStateChanged(auth, async (usuario) => {
-    if (!usuario) return; // auth.js redirige al login
+    if (!usuario) {
+      cancelarEscuchasAdmin.forEach((cancelar) => cancelar());
+      cancelarEscuchasAdmin = [];
+      adminUid = null;
+      return; // auth.js redirige al login
+    }
     adminUid = usuario.uid;
     try {
       const datos = await loadProfile(usuario.uid);
@@ -1477,8 +1511,9 @@ function init() {
     loadStats();
     loadRatings().then(() => { renderTutors(); renderAnalytics(); renderSubjectList(); renderActivity(); }); // los promedios salen de las calificaciones
     loadCases();
+    suscribirDatosAdmin();
   });
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-else init();
+else init();

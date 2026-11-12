@@ -11,7 +11,8 @@ import {
   collection,
   query,
   where,
-  getDocs
+  getDocs,
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import {
   onAuthStateChanged
@@ -38,6 +39,7 @@ import { api } from "./api.js";
   let blocks = [];          // disponibilidad, sincronizada con Firestore
   let tutorUid = null;      // uid del tutor autenticado
   let calificacionesData = []; // calificaciones que recibió este tutor
+  let cancelarEscuchas = []; // listeners Firestore del tutor actual
 
   const notifications = [
     {
@@ -691,6 +693,16 @@ import { api } from "./api.js";
   function renderCalendar() {
     const dates = dayNames.map((_, i) => dateISO(addDays(weekStart, i)));
     const lastDay = addDays(weekStart, 6);
+    const ahora = new Date();
+    const hoy = dateISO(ahora);
+    const horaActual = `${String(ahora.getHours()).padStart(2, "0")}:${String(ahora.getMinutes()).padStart(2, "0")}`;
+    const bloqueVigente = (b) => b.fecha > hoy || (b.fecha === hoy && b.horaFin > horaActual);
+    const sesionesQueOcupan = tutoriasData
+      .filter((t) => t.estado === "programada" || t.estado === "completada")
+      .map(normalizarTutoria);
+    const bloquesVisibles = blocks.filter((b) => bloqueVigente(b) && !sesionesQueOcupan.some((s) =>
+      overlaps({ date: b.fecha, start: b.horaInicio, end: b.horaFin }, s)
+    ));
 
     $("#tutor-week-title").textContent =
       `${weekStart.getDate()}–${lastDay.getDate()} · ` +
@@ -719,7 +731,7 @@ import { api } from "./api.js";
       }
 
       // Bloques disponibles
-      blocks.filter((b) => b.fecha === date).forEach((block) => {
+      bloquesVisibles.filter((b) => b.fecha === date).forEach((block) => {
         const top = (minutes(block.horaInicio) - 480) * 0.8;
         const height = (minutes(block.horaFin) - minutes(block.horaInicio)) * 0.8;
         html += `<button class="tutor-calendar-block" type="button"
@@ -750,7 +762,7 @@ import { api } from "./api.js";
     $("#tutor-calendar").innerHTML = html;
 
     // Lista de bloques de la semana visible
-    const weekBlocks = [...blocks]
+    const weekBlocks = [...bloquesVisibles]
       .filter((b) => dates.includes(b.fecha))
       .sort((a, b) => `${a.fecha}T${a.horaInicio}`.localeCompare(`${b.fecha}T${b.horaInicio}`));
 
@@ -1071,6 +1083,24 @@ import { api } from "./api.js";
     navigate();
   }
 
+  function suscribirDatos(uid) {
+    cancelarEscuchas.forEach((cancelar) => cancelar());
+    cancelarEscuchas = [
+      onSnapshot(query(collection(db, "solicitudes"), where("tutorId", "==", uid)), (snap) => {
+        solicitudesData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        renderAll();
+      }, (err) => console.warn("No se pudieron sincronizar las solicitudes:", err)),
+      onSnapshot(query(collection(db, "tutorias"), where("tutorId", "==", uid)), (snap) => {
+        tutoriasData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        renderAll();
+      }, (err) => console.warn("No se pudieron sincronizar las tutorías:", err)),
+      onSnapshot(query(collection(db, "calificaciones"), where("tutorId", "==", uid)), (snap) => {
+        calificacionesData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        renderAll();
+      }, (err) => console.warn("No se pudieron sincronizar las calificaciones:", err))
+    ];
+  }
+
   // ----------------------------------------------------------------
   // Firestore: escritura de solicitudes y tutorías
   // ----------------------------------------------------------------
@@ -1255,6 +1285,11 @@ import { api } from "./api.js";
   onAuthStateChanged(auth, async (usuario) => {
     if (usuario) {
       await cargarTodo(usuario.uid);
+      suscribirDatos(usuario.uid);
+    } else {
+      cancelarEscuchas.forEach((cancelar) => cancelar());
+      cancelarEscuchas = [];
+      tutorUid = null;
     }
   });
-})();
+})();

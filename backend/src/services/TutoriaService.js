@@ -2,6 +2,42 @@ import { Conflicto, NoEncontrado, Prohibido } from "../errores.js";
 import { esTutorAprobado } from "../utils/roles.js";
 
 const nombreCompleto = (u) => `${u.nombre || ""} ${u.apellido || ""}`.trim();
+const minutos = (hora) => {
+  const [h, m] = hora.split(":").map(Number);
+  return h * 60 + m;
+};
+const hora = (total) => `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+
+function quitarHorarioCompletado(disponibilidad, tutoria) {
+  const inicioTutoria = minutos(tutoria.horaInicio);
+  const finTutoria = minutos(tutoria.horaFin);
+
+  return (Array.isArray(disponibilidad) ? disponibilidad : []).flatMap((bloque) => {
+    if (bloque.fecha !== tutoria.fecha || !bloque.horaInicio || !bloque.horaFin) return [bloque];
+
+    const inicioBloque = minutos(bloque.horaInicio);
+    const finBloque = minutos(bloque.horaFin);
+    if (finBloque <= inicioTutoria || inicioBloque >= finTutoria) return [bloque];
+
+    const partes = [];
+    const baseId = bloque.id || "disponibilidad";
+    if (inicioBloque < inicioTutoria) {
+      partes.push({
+        ...bloque,
+        id: `${baseId}-antes-${tutoria.id}`,
+        horaFin: hora(inicioTutoria)
+      });
+    }
+    if (finBloque > finTutoria) {
+      partes.push({
+        ...bloque,
+        id: `${baseId}-despues-${tutoria.id}`,
+        horaInicio: hora(finTutoria)
+      });
+    }
+    return partes;
+  });
+}
 
 export class TutoriaService {
   constructor({ usuarioRepo, tutoriaRepo, reservaRepo, notificaciones }) {
@@ -28,9 +64,20 @@ export class TutoriaService {
   // Solo el tutor marca la tutoría como realizada (habilita la calificación del estudiante).
   async completar(usuario, id) {
     if (!esTutorAprobado(usuario)) throw new Prohibido("Solo un tutor aprobado puede completar tutorías");
-    await this.#cambiarEstado(id, "completada", (t) => {
-      if (t.tutorId !== usuario.id) throw new Prohibido("Esta tutoría no es tuya");
-    });
+    await this.#cambiarEstado(
+      id,
+      "completada",
+      (t) => {
+        if (t.tutorId !== usuario.id) throw new Prohibido("Esta tutoría no es tuya");
+      },
+      async (tutoria, tx) => {
+        const tutor = await tx.obtenerUsuario(tutoria.tutorId);
+        if (!tutor) throw new NoEncontrado("No se encontró el perfil del tutor");
+        tx.actualizarUsuario(tutoria.tutorId, {
+          disponibilidad: quitarHorarioCompletado(tutor.disponibilidad, { ...tutoria, id })
+        });
+      }
+    );
     return { id, estado: "completada" };
   }
 
@@ -51,14 +98,15 @@ export class TutoriaService {
     return { id, estado: "cancelada" };
   }
 
-  #cambiarEstado(id, nuevoEstado, verificarPermiso) {
+  #cambiarEstado(id, nuevoEstado, verificarPermiso, antesDeActualizar) {
     return this.reservaRepo.transaccion(async (tx) => {
       const tutoria = await tx.obtenerTutoria(id);
       if (!tutoria) throw new NoEncontrado("Tutoría no encontrada");
-      verificarPermiso(tutoria);
+      await verificarPermiso(tutoria, tx);
       if (tutoria.estado !== "programada") {
         throw new Conflicto(`La tutoría ya está ${tutoria.estado}; solo se pueden modificar las programadas`);
       }
+      if (antesDeActualizar) await antesDeActualizar(tutoria, tx);
       tx.actualizarTutoria(id, { estado: nuevoEstado });
       return tutoria;
     });

@@ -12,7 +12,8 @@ import {
   collection,
   query,
   where,
-  getDocs
+  getDocs,
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import {
   onAuthStateChanged
@@ -164,6 +165,7 @@ let solicitudesData = [];   // docs de "solicitudes" del estudiante
 let tutoriasData    = [];   // docs de "tutorias" del estudiante
 let tutoresData     = [];   // docs de "usuarios" (tutores aprobados)
 let misCalificaciones = {}; // tutoriaId → calificación que dio este estudiante
+let cancelarEscuchasEstudiante = []; // listeners Firestore del usuario actual
 let resumenCalif    = {};   // tutorId → { promedio, total, comentarios[] } (solo visibles)
 let enviandoCalif   = false;
 let selectedSession = null; // { id, tipo: "solicitud"|"tutoria" }
@@ -531,6 +533,32 @@ async function cargarMisCalificaciones(uid) {
   } catch (err) {
     console.warn("No se pudieron cargar tus calificaciones:", err);
   }
+}
+
+function suscribirDatosEstudiante(uid) {
+  cancelarEscuchasEstudiante.forEach((cancelar) => cancelar());
+  cancelarEscuchasEstudiante = [
+    onSnapshot(query(collection(db, "solicitudes"), where("estudianteId", "==", uid)), (snap) => {
+      solicitudesData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      refrescarVistas();
+    }, (err) => console.warn("No se pudieron sincronizar las solicitudes:", err)),
+    onSnapshot(query(collection(db, "tutorias"), where("estudianteId", "==", uid)), (snap) => {
+      tutoriasData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      tutoriasEstado = "listo";
+      tutoriasError = null;
+      refrescarVistas();
+    }, (err) => {
+      console.warn("No se pudieron sincronizar las tutorías:", err);
+      tutoriasEstado = "error";
+      tutoriasError = err;
+      refrescarVistas();
+    }),
+    onSnapshot(query(collection(db, "calificaciones"), where("estudianteId", "==", uid)), (snap) => {
+      misCalificaciones = {};
+      snap.docs.forEach((d) => { misCalificaciones[d.id] = { id: d.id, ...d.data() }; });
+      refrescarVistas();
+    }, (err) => console.warn("No se pudieron sincronizar tus calificaciones:", err))
+  ];
 }
 
 function getItemsByTab(tab) {
@@ -1801,6 +1829,7 @@ function renderNotificaciones() {
 function refrescarVistas() {
   doRefreshSessions?.();
   doRefreshTutores?.();
+  if (selectedSession) renderDetail();
   renderInicio();
   renderNotificaciones();
 }
@@ -1828,8 +1857,12 @@ window.addEventListener("hashchange", () => {
 refrescarVistas();
 
 onAuthStateChanged(auth, async (usuario) => {
-  if (!usuario) return; // auth.js redirige al login
-
+  if (!usuario) {
+    cancelarEscuchasEstudiante.forEach((cancelar) => cancelar());
+    cancelarEscuchasEstudiante = [];
+    estudianteUid = null;
+    return; // auth.js redirige al login
+  }
   estudianteUid = usuario.uid;
 
   // Los tres bloques cargan en paralelo y cada uno pinta su parte al llegar
@@ -1838,4 +1871,5 @@ onAuthStateChanged(auth, async (usuario) => {
     cargarTutorias(usuario.uid).then(refrescarVistas),
     cargarTutores().then(refrescarVistas)
   ]);
+  suscribirDatosEstudiante(usuario.uid);
 });

@@ -68,11 +68,13 @@ export function crearMundo() {
       const tx = {
         async obtenerSolicitud(id) { return copia(datos.solicitudes.get(id)); },
         async obtenerTutoria(id) { return copia(datos.tutorias.get(id)); },
+        async obtenerUsuario(id) { return copia(datos.usuarios.get(id)); },
         async tutoriasProgramadas(tutorId, fecha) {
           return [...datos.tutorias.values()].filter((t) => t.tutorId === tutorId && t.fecha === fecha && t.estado === "programada").map(copia);
         },
         actualizarSolicitud(id, d) { Object.assign(datos.solicitudes.get(id), d); },
         actualizarTutoria(id, d) { Object.assign(datos.tutorias.get(id), d); },
+        actualizarUsuario(id, d) { Object.assign(datos.usuarios.get(id), d); },
         crearTutoria(d) { const id = nuevoId("tut"); datos.tutorias.set(id, { id, ...d }); return id; }
       };
       return fn(tx);

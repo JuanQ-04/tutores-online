@@ -9,6 +9,7 @@ export class ReservaRepository {
     const db = getDb();
     const solicitudes = db.collection("solicitudes");
     const tutorias = db.collection("tutorias");
+    const usuarios = db.collection("usuarios");
 
     return db.runTransaction(async (t) => {
       const tx = {
@@ -18,6 +19,10 @@ export class ReservaRepository {
         },
         async obtenerTutoria(id) {
           const doc = await t.get(tutorias.doc(id));
+          return doc.exists ? aObjeto(doc) : null;
+        },
+        async obtenerUsuario(id) {
+          const doc = await t.get(usuarios.doc(id));
           return doc.exists ? aObjeto(doc) : null;
         },
         async tutoriasProgramadas(tutorId, fecha) {
@@ -34,6 +39,9 @@ export class ReservaRepository {
         },
         actualizarTutoria(id, datos) {
           t.update(tutorias.doc(id), datos);
+        },
+        actualizarUsuario(id, datos) {
+          t.update(usuarios.doc(id), datos);
         },
         crearTutoria(datos) {
           const ref = tutorias.doc();

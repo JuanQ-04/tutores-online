@@ -17,10 +17,12 @@ async function conTutoriaProgramada() {
 }
 
 test("completar: solo el tutor dueño; luego ya no se puede cancelar", async () => {
-  const { u, tutorias, tutoriaId } = await conTutoriaProgramada();
+  const { m, u, tutorias, tutoriaId } = await conTutoriaProgramada();
   await assert.rejects(() => tutorias.completar(u.est1, tutoriaId), { status: 403 });
   await assert.rejects(() => tutorias.completar({ ...u.tutorUsuario, id: "otro" }, tutoriaId), { status: 403 });
   await tutorias.completar(u.tutorUsuario, tutoriaId);
+  assert.equal(m.datos.tutorias.get(tutoriaId).estado, "completada");
+  assert.equal((await m.tutoriaRepo.listarProgramadas("tutor1")).some((t) => t.id === tutoriaId), false);
   await assert.rejects(() => tutorias.cancelar(u.est1, tutoriaId), { status: 409 });
 });
 
@@ -41,7 +43,7 @@ test("obtener: solo participantes ven el detalle (y el enlace)", async () => {
 });
 
 test("calificar: exige tutoría completada, dueña, 1-5 estrellas y una sola vez", async () => {
-  const { u, tutorias, calificaciones, tutoriaId } = await conTutoriaProgramada();
+  const { m, u, tutorias, calificaciones, tutoriaId } = await conTutoriaProgramada();
   await assert.rejects(() => calificaciones.crear(u.est1, { tutoriaId, estrellas: 5 }), { status: 409 }); // aún programada
   await tutorias.completar(u.tutorUsuario, tutoriaId);
 
@@ -50,6 +52,7 @@ test("calificar: exige tutoría completada, dueña, 1-5 estrellas y una sola vez
   await assert.rejects(() => calificaciones.crear(u.est1, { tutoriaId, estrellas: 4.5 }), { status: 400 });
 
   const r = await calificaciones.crear(u.est1, { tutoriaId, estrellas: 5, comentario: "Excelente" });
+  assert.equal(m.datos.calificaciones.get(tutoriaId).estrellas, 5);
   assert.equal(r.estado, "visible");
   assert.equal(r.tutorId, "tutor1");
   await assert.rejects(() => calificaciones.crear(u.est1, { tutoriaId, estrellas: 3 }), { status: 409 });
