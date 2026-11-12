@@ -1,3 +1,5 @@
+import { cargarMaterias } from "./materias.js";
+
 const form = document.getElementById("tutor-form");
 const statusNote = document.getElementById("tutor-form-note");
 
@@ -9,17 +11,19 @@ const presentationInput = document.getElementById("presentacion");
 const presentationCount = document.getElementById("presentacion-count");
 const fileInput = document.getElementById("hoja-vida");
 
-const subjectInputs = [
-  ...form.querySelectorAll('input[name="materias"]')
-];
+const subjectsGrid = document.getElementById("materias-grid");
+const studyLevelInput = document.getElementById("nivel-estudios");
+const teachLevelInput = document.getElementById("nivel-ensenanza");
+const experienceInput = document.getElementById("experiencia");
+
+// Las materias llegan de la API después de cargar la página: se consultan siempre en el momento.
+const subjectInputs = () => [...form.querySelectorAll('input[name="materias"]')];
 
 const timeInputs = [
   ...form.querySelectorAll('input[name="franjas"]')
 ];
 
-const fields = [
-  ...form.querySelectorAll("input, select, textarea")
-];
+const allFields = () => [...form.querySelectorAll("input, select, textarea")];
 
 // Límite del PDF: se guarda dentro de Firestore (máx. 1 MiB por documento) y
 // el base64 pesa ~33 % más que el archivo, así que 700 KB deja margen.
@@ -37,6 +41,26 @@ function leerArchivoComoDataURL(file) {
     lector.readAsDataURL(file);
   });
 }
+
+// Pinta una casilla por materia del catálogo (las de base y las que agregó el administrador).
+function pintarMaterias(lista) {
+  const marcadas = new Set(subjectInputs().filter((input) => input.checked).map((input) => input.value));
+  subjectsGrid.replaceChildren(...lista.map((materia) => {
+    const etiqueta = document.createElement("label");
+    etiqueta.className = "check-option";
+    const casilla = document.createElement("input");
+    casilla.type = "checkbox";
+    casilla.name = "materias";
+    casilla.value = materia.id;
+    casilla.checked = marcadas.has(materia.id);
+    const texto = document.createElement("span");
+    texto.textContent = materia.nombre;
+    etiqueta.append(casilla, texto);
+    return etiqueta;
+  }));
+}
+
+cargarMaterias().then(pintarMaterias);
 
 statusNote.setAttribute("role", "status");
 statusNote.setAttribute("aria-live", "polite");
@@ -62,7 +86,7 @@ function updatePresentationCount() {
 
 // Elimina errores anteriores antes de comprobar todo nuevamente.
 function clearValidationErrors() {
-  fields.forEach((field) => {
+  allFields().forEach((field) => {
     field.setCustomValidity("");
     field.removeAttribute("aria-invalid");
   });
@@ -81,7 +105,7 @@ function validateText(field, message) {
 // Para grupos de casillas, coloca el error en la primera casilla.
 // No usamos required en cada casilla: eso exigiría marcarlas todas.
 function validateCheckboxGroup(inputs, message) {
-  if (!inputs.some((input) => input.checked)) {
+  if (inputs.length && !inputs.some((input) => input.checked)) {
     inputs[0].setCustomValidity(message);
   }
 }
@@ -138,7 +162,7 @@ function validateTutorForm() {
   updatePresentationCount();
 
   validateCheckboxGroup(
-    subjectInputs,
+    subjectInputs(),
     "Selecciona al menos una materia que quieras enseñar."
   );
 
@@ -170,7 +194,7 @@ function validateTutorForm() {
 
   // required, min, max, step y maxlength siguen siendo
   // los establecidos en el HTML.
-  fields.forEach((field) => {
+  allFields().forEach((field) => {
     if (!field.validity.valid) {
       field.setAttribute("aria-invalid", "true");
     }
@@ -184,6 +208,11 @@ let enviando = false;
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (enviando) return; // evita doble clic mientras sube el PDF
+
+  if (!subjectInputs().length) {
+    statusNote.textContent = "Todavía estamos cargando las materias. Espera un momento e inténtalo de nuevo.";
+    return;
+  }
 
   if (!validateTutorForm()) {
     statusNote.textContent =
@@ -220,14 +249,17 @@ form.addEventListener("submit", async (event) => {
         institucion: institutionInput.value,
         ciudad: cityInput.value,
         presentacion: presentationInput.value,
-        materias: subjectInputs
+        nivelEstudios: studyLevelInput.value,
+        nivelEnsenanza: teachLevelInput.value,
+        experiencia: Number(experienceInput.value),
+        modalidad: form.querySelector('input[name="modalidad"]:checked').value,
+        materias: subjectInputs()
           .filter((input) => input.checked)
           .map((input) => input.value),
         franjas: timeInputs
           .filter((input) => input.checked)
           .map((input) => input.value),
-        tarifa: Number(tarifaInput.value) || 0,
-        hojaVidaPDF: archivo.name
+        tarifa: Number(tarifaInput.value) || 0
       },
       { nombreArchivo: archivo.name, tamano: archivo.size, dataURL }
     );
@@ -257,7 +289,7 @@ function handleFieldEdit(event) {
   // de la que acaba de marcar el usuario.
   if (field.name === "materias" || field.name === "franjas") {
     const group = field.name === "materias"
-      ? subjectInputs
+      ? subjectInputs()
       : timeInputs;
 
     group.forEach((input) => {

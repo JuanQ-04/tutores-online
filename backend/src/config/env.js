@@ -10,6 +10,9 @@ export const env = {
     process.env.CORS_ORIGINS,
     "http://localhost:3000,http://localhost:5500,http://127.0.0.1:5500"
   ),
+  // Peticiones por IP cada 15 minutos. Los paneles consultan la API cada ~30 s, y varios
+  // usuarios pueden compartir IP (una red de colegio, por ejemplo), así que se deja holgado.
+  limitePeticiones: Number(process.env.RATE_LIMIT_MAX) || 1000,
   zonaHoraria: process.env.ZONA_HORARIA || "America/Bogota",
   jitsiBaseUrl: (process.env.JITSI_BASE_URL || "https://meet.jit.si").replace(/\/$/, ""),
   firebase: {

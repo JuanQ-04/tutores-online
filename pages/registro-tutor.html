@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/auth.css">
   <script type="module" src="../js/auth.js"></script>
-  <script src="../js/registro-tutor.js" defer></script>
+  <script type="module" src="../js/registro-tutor.js"></script>
 </head>
 
 <body class="auth-body">
@@ -153,31 +153,9 @@
 
         <fieldset class="form-section">
           <legend>¿Qué quieres enseñar?</legend>
-          <div class="check-grid" role="group" aria-label="Materias">
-            <label class="check-option">
-              <input type="checkbox" name="materias" value="matematicas">
-              <span>Matemáticas</span>
-            </label>
-            <label class="check-option">
-              <input type="checkbox" name="materias" value="fisica">
-              <span>Física</span>
-            </label>
-            <label class="check-option">
-              <input type="checkbox" name="materias" value="quimica">
-              <span>Química</span>
-            </label>
-            <label class="check-option">
-              <input type="checkbox" name="materias" value="programacion">
-              <span>Programación</span>
-            </label>
-            <label class="check-option">
-              <input type="checkbox" name="materias" value="idiomas">
-              <span>Idiomas</span>
-            </label>
-            <label class="check-option">
-              <input type="checkbox" name="materias" value="estadistica">
-              <span>Estadística</span>
-            </label>
+          <!-- Las materias vienen de la API (las agrega el administrador): las pinta js/registro-tutor.js -->
+          <div class="check-grid" id="materias-grid" role="group" aria-label="Materias">
+            <p class="auth-form-note">Cargando materias…</p>
           </div>
           <small id="materias-help" class="auth-form-note">Selecciona al menos una materia.</small>
           <div class="form-group">
@@ -200,15 +178,15 @@
           <legend>Modalidad y tarifa</legend>
           <div class="account-type-options">
             <label class="account-type-option">
-              <input type="radio" name="modalidad" value="virtual" checked required>
+              <input type="radio" name="modalidad" value="Virtual" checked required>
               <span><strong>Virtual</strong></span>
             </label>
             <label class="account-type-option">
-              <input type="radio" name="modalidad" value="presencial" required>
+              <input type="radio" name="modalidad" value="Presencial" required>
               <span><strong>Presencial</strong></span>
             </label>
             <label class="account-type-option">
-              <input type="radio" name="modalidad" value="ambas" required>
+              <input type="radio" name="modalidad" value="Virtual y presencial" required>
               <span><strong>Ambas</strong></span>
             </label>
           </div>

@@ -5,12 +5,12 @@
 //   #security-form   → cambio real de contraseña (Firebase Auth)
 //   #security-reset  → correo para restablecer la contraseña
 //   #config-*        → datos de la cuenta y de la sesión actual
-//   #contact-form    → mensaje al equipo de soporte (Firestore: mensajesSoporte)
+//   #contact-form    → mensaje al equipo de soporte (API: POST /soporte)
 //   [data-open-contact] → abre el diálogo #contact-dialog
 //
 // Se carga con: <script type="module" src="../js/configuracion.js"></script>
 
-import { auth, db } from "./firebase-config.js";
+import { auth } from "./firebase-config.js";
 import {
   onAuthStateChanged,
   EmailAuthProvider,
@@ -18,19 +18,11 @@ import {
   updatePassword,
   sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import {
-  doc,
-  getDoc,
-  addDoc,
-  collection,
-  serverTimestamp
-} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { api } from "./api.js";
 
 const $ = (selector, scope = document) => scope.querySelector(selector);
 
 auth.languageCode = "es"; // los correos de Firebase llegan en español
-
-let perfil = { nombre: "", rol: "" };
 
 /* ---------- Aviso flotante (usa el toast de cada panel) ---------- */
 let avisoTimer = null;
@@ -216,27 +208,15 @@ function errorContrasena(codigo) {
     if (note) note.textContent = "Enviando…";
 
     try {
-      await addDoc(collection(db, "mensajesSoporte"), {
-        usuarioId: usuario.uid,
-        usuarioNombre: perfil.nombre || usuario.displayName || "Usuario",
-        usuarioEmail: usuario.email || "",
-        rol: perfil.rol || "",
-        asunto,
-        mensaje,
-        estado: "abierto",
-        creadoEn: serverTimestamp()
-      });
+      // Quién escribe (nombre, correo y rol) lo completa el servidor a partir de la sesión.
+      await api.enviarSoporte({ asunto, mensaje });
       form.reset();
       if (note) note.textContent = "Mensaje enviado. El equipo te responderá a tu correo.";
       dialog?.close();
       avisar("Mensaje enviado al equipo de soporte.");
     } catch (err) {
       console.error("No se pudo enviar el mensaje:", err);
-      if (note) {
-        note.textContent = err?.code === "permission-denied"
-          ? "Firestore no permite guardar el mensaje: revisa las reglas (mensajesSoporte)."
-          : "No se pudo enviar el mensaje. Revisa tu conexión.";
-      }
+      if (note) note.textContent = err?.message || "No se pudo enviar el mensaje. Revisa tu conexión.";
     } finally {
       if (boton) boton.disabled = false;
     }
@@ -244,16 +224,7 @@ function errorContrasena(codigo) {
 }
 
 /* ---------- Inicio ---------- */
-onAuthStateChanged(auth, async (usuario) => {
+onAuthStateChanged(auth, (usuario) => {
   if (!usuario) return; // auth.js redirige al login
   pintarCuenta(usuario);
-  try {
-    const snap = await getDoc(doc(db, "usuarios", usuario.uid));
-    if (snap.exists()) {
-      const d = snap.data();
-      perfil = { nombre: `${d.nombre || ""} ${d.apellido || ""}`.trim(), rol: d.rol || "" };
-    }
-  } catch (err) {
-    console.warn("No se pudo leer el perfil para Configuración:", err);
-  }
 });

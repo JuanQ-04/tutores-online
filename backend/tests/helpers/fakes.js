@@ -1,5 +1,7 @@
 // Dobles de prueba en memoria: permiten probar las reglas SIN Firebase ni internet.
 import { Reloj } from "../../src/utils/tiempo.js";
+import { MateriaService } from "../../src/services/MateriaService.js";
+import { BandejaService } from "../../src/services/BandejaService.js";
 
 export const relojFijo = (iso = "2026-11-11T15:00:00Z") =>
   new Reloj({ zona: "America/Bogota", ahoraFn: () => new Date(iso) }); // = 2026-11-11 10:00 en Bogotá
@@ -9,7 +11,13 @@ export function crearMundo() {
     usuarios: new Map(),
     solicitudes: new Map(),
     tutorias: new Map(),
-    calificaciones: new Map()
+    calificaciones: new Map(),
+    hojasDeVida: new Map(),
+    hojasPendientes: new Map(),
+    soporte: new Map(),
+    materias: new Map(),
+    cambios: new Map(),
+    bandeja: new Map() // uid → avisos (el más nuevo al final)
   };
   let contador = 0;
   const nuevoId = (p) => `${p}${++contador}`;
@@ -17,6 +25,22 @@ export function crearMundo() {
 
   const usuarioRepo = {
     async obtenerPorId(id) { return copia(datos.usuarios.get(id)); },
+    async crear(id, d) {
+      if (datos.usuarios.has(id)) {
+        const { Conflicto } = await import("../../src/errores.js");
+        throw new Conflicto("El perfil ya existe");
+      }
+      datos.usuarios.set(id, { id, ...d, creadoEn: "2026-11-11T15:00:00.000Z" });
+      return copia(datos.usuarios.get(id));
+    },
+    async actualizar(id, cambios) { Object.assign(datos.usuarios.get(id), cambios); },
+    async enviarSolicitudTutor(id, d) {
+      Object.assign(datos.usuarios.get(id), d, { solicitudEnviadaEn: "2026-11-11T15:00:00.000Z" });
+    },
+    async registrarRevision(id, estado, adminId) {
+      Object.assign(datos.usuarios.get(id), { estado, revisadoPor: adminId, revisadoEn: "2026-11-11T15:00:00.000Z" });
+    },
+    async listarTodos(rol) { return [...datos.usuarios.values()].filter((u) => !rol || u.rol === rol).map(copia); },
     async listarTutoresVisibles() {
       return [...datos.usuarios.values()]
         .filter((u) => u.rol === "tutor" && ["aprobado", "aceptado"].includes(u.estado) && u.activo !== false)
@@ -31,7 +55,8 @@ export function crearMundo() {
         s.estudianteId === estudianteId && s.tutorId === tutorId && s.fecha === fecha && s.horaInicio === horaInicio);
     },
     async listarPorEstudiante(uid) { return [...datos.solicitudes.values()].filter((s) => s.estudianteId === uid).map(copia); },
-    async listarPorTutor(uid) { return [...datos.solicitudes.values()].filter((s) => s.tutorId === uid).map(copia); }
+    async listarPorTutor(uid) { return [...datos.solicitudes.values()].filter((s) => s.tutorId === uid).map(copia); },
+    async listarTodas() { return [...datos.solicitudes.values()].map(copia); }
   };
   const tutoriaRepo = {
     async obtenerPorId(id) { return copia(datos.tutorias.get(id)); },
@@ -39,7 +64,8 @@ export function crearMundo() {
       return [...datos.tutorias.values()].filter((t) => t.estado === "programada" && (!tutorId || t.tutorId === tutorId)).map(copia);
     },
     async listarPorEstudiante(uid) { return [...datos.tutorias.values()].filter((t) => t.estudianteId === uid).map(copia); },
-    async listarPorTutor(uid) { return [...datos.tutorias.values()].filter((t) => t.tutorId === uid).map(copia); }
+    async listarPorTutor(uid) { return [...datos.tutorias.values()].filter((t) => t.tutorId === uid).map(copia); },
+    async listarTodas() { return [...datos.tutorias.values()].map(copia); }
   };
   const calificacionRepo = {
     async crear(id, d) {
@@ -49,6 +75,13 @@ export function crearMundo() {
       }
       datos.calificaciones.set(id, { id, ...d });
     },
+    async obtenerPorId(id) { return copia(datos.calificaciones.get(id)); },
+    async moderar(id, cambios, adminId) {
+      Object.assign(datos.calificaciones.get(id), cambios, { editadaPorAdmin: adminId });
+    },
+    async listarPorEstudiante(uid) { return [...datos.calificaciones.values()].filter((c) => c.estudianteId === uid).map(copia); },
+    async listarPorTutor(uid) { return [...datos.calificaciones.values()].filter((c) => c.tutorId === uid).map(copia); },
+    async listarTodas() { return [...datos.calificaciones.values()].map(copia); },
     async listarVisiblesPorTutor(tutorId) {
       return [...datos.calificaciones.values()].filter((c) => c.tutorId === tutorId && c.estado === "visible").map(copia);
     },
@@ -80,6 +113,60 @@ export function crearMundo() {
       return fn(tx);
     }
   };
+  const hojaVidaRepo = {
+    async obtenerPorId(id) { return copia(datos.hojasDeVida.get(id)); },
+    async guardar(id, d) { datos.hojasDeVida.set(id, { id, ...d, tutorId: id }); },
+    async eliminar(id) { datos.hojasDeVida.delete(id); }
+  };
+  const hojaVidaPendienteRepo = {
+    async obtenerPorId(id) { return copia(datos.hojasPendientes.get(id)); },
+    async guardar(id, d) { datos.hojasPendientes.set(id, { id, ...d, tutorId: id }); },
+    async eliminar(id) { datos.hojasPendientes.delete(id); }
+  };
+  const materiaRepo = {
+    async listar() { return [...datos.materias.values()].map(copia); },
+    async crear(id, d) {
+      if (datos.materias.has(id)) {
+        const { Conflicto } = await import("../../src/errores.js");
+        throw new Conflicto("Ya existe una materia con ese nombre");
+      }
+      datos.materias.set(id, { id, ...d });
+    }
+  };
+  const materiaService = new MateriaService({ materiaRepo });
+  const cambioRepo = {
+    async obtenerPorId(id) { return copia(datos.cambios.get(id)); },
+    async guardar(id, d) { datos.cambios.set(id, { id, ...d, tutorId: id, creadaEn: "2026-11-11T15:00:00.000Z" }); },
+    async eliminar(id) { datos.cambios.delete(id); },
+    async resolver(id, estado, adminId, nota) {
+      Object.assign(datos.cambios.get(id), { estado, nota, revisadaPor: adminId, revisadaEn: "2026-11-11T16:00:00.000Z" });
+    },
+    async listarTodos() { return [...datos.cambios.values()].map(copia); }
+  };
+  const soporteRepo = {
+    async obtenerPorId(id) { return copia(datos.soporte.get(id)); },
+    async crear(d) { const id = nuevoId("caso"); datos.soporte.set(id, { id, ...d }); return id; },
+    async actualizar(id, cambios) { Object.assign(datos.soporte.get(id), cambios); },
+    async listarTodos() { return [...datos.soporte.values()].map(copia); }
+  };
+  const bandejaRepo = {
+    async crear(uid, d) {
+      const lista = datos.bandeja.get(uid) || [];
+      const id = nuevoId("aviso");
+      lista.push({ id, ...d, leida: false, creadaEn: "2026-11-11T15:00:00.000Z" });
+      datos.bandeja.set(uid, lista);
+      return id;
+    },
+    async listar(uid, limite) { return [...(datos.bandeja.get(uid) || [])].reverse().slice(0, limite).map(copia); },
+    async obtenerPorId(uid, id) { return copia((datos.bandeja.get(uid) || []).find((a) => a.id === id)); },
+    async marcarLeida(uid, id) { (datos.bandeja.get(uid) || []).find((a) => a.id === id).leida = true; },
+    async marcarTodas(uid) {
+      const sin = (datos.bandeja.get(uid) || []).filter((a) => !a.leida);
+      sin.forEach((a) => { a.leida = true; });
+      return sin.length;
+    }
+  };
+  const avisos = new BandejaService({ bandejaRepo, usuarioRepo });
   const correos = [];
   const notificaciones = {
     async nuevaSolicitud(x) { correos.push({ tipo: "nuevaSolicitud", ...x }); },
@@ -89,7 +176,11 @@ export function crearMundo() {
   };
   const videoconferencia = { crearSala: () => "https://meet.jit.si/TutoresOnline-sala-de-prueba" };
 
-  return { datos, usuarioRepo, solicitudRepo, tutoriaRepo, calificacionRepo, reservaRepo, notificaciones, videoconferencia, correos };
+  return {
+    datos, usuarioRepo, solicitudRepo, tutoriaRepo, calificacionRepo, reservaRepo,
+    hojaVidaRepo, hojaVidaPendienteRepo, materiaRepo, materiaService, cambioRepo,
+    soporteRepo, notificaciones, videoconferencia, correos, bandejaRepo, avisos
+  };
 }
 
 // Datos base: un tutor aprobado con un bloque virtual mañana, y un estudiante.
@@ -105,10 +196,14 @@ export function sembrar(mundo) {
   });
   mundo.datos.usuarios.set("est1", { id: "est1", rol: "estudiante", estado: "activo", nombre: "Luis", apellido: "Perez", email: "luis@test.com" });
   mundo.datos.usuarios.set("est2", { id: "est2", rol: "estudiante", estado: "activo", nombre: "Marta", apellido: "Gil", email: "marta@test.com" });
+  mundo.datos.usuarios.set("admin1", { id: "admin1", rol: "admin", estado: "activo", nombre: "Root", apellido: "Admin", email: "admin@test.com" });
+  mundo.datos.usuarios.set("nuevo1", { id: "nuevo1", rol: "tutor", estado: "incompleto", nombre: "Nora", apellido: "Vega", email: "nora@test.com", activo: true });
+  const adminUsuario = { id: "admin1", rol: "admin", estado: "activo", nombre: "Root", apellido: "Admin", email: "admin@test.com" };
+  const tutorNuevo = { id: "nuevo1", rol: "tutor", estado: "incompleto", nombre: "Nora", apellido: "Vega", email: "nora@test.com" };
   const tutorUsuario = { id: "tutor1", rol: "tutor", estado: "aprobado", nombre: "Ana", apellido: "Ruiz", email: "ana@test.com" };
   const est1 = { id: "est1", rol: "estudiante", estado: "activo", nombre: "Luis", apellido: "Perez", email: "luis@test.com" };
   const est2 = { id: "est2", rol: "estudiante", estado: "activo", nombre: "Marta", apellido: "Gil", email: "marta@test.com" };
-  return { tutorUsuario, est1, est2 };
+  return { tutorUsuario, est1, est2, adminUsuario, tutorNuevo };
 }
 
 export const cuerpoSolicitud = (extra = {}) => ({

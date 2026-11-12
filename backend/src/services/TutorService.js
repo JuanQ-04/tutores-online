@@ -1,10 +1,22 @@
 import { NoEncontrado } from "../errores.js";
+import { MODALIDADES } from "../utils/catalogos.js";
 import { normalizar } from "../utils/texto.js";
 import { fecha as validarFecha } from "../utils/validar.js";
 import { seSolapan } from "../utils/tiempo.js";
 
 const ESTADOS_VISIBLES = ["aprobado", "aceptado"];
 const LIMITE_MAXIMO = 100;
+
+// La modalidad es la que el tutor eligió en su perfil, no la de sus bloques. Solo un perfil
+// antiguo, sin modalidad guardada, se deduce de los bloques que ya tiene (hasta que la complete).
+function modalidadDe(tutor, bloques) {
+  if (MODALIDADES.includes(tutor.modalidad)) return tutor.modalidad;
+  const usadas = new Set(bloques.map((b) => b.modalidad));
+  const virtual = usadas.has("Virtual") || usadas.has("Virtual y presencial");
+  const presencial = usadas.has("Presencial") || usadas.has("Virtual y presencial");
+  if (virtual && presencial) return "Virtual y presencial";
+  return virtual ? "Virtual" : presencial ? "Presencial" : "";
+}
 
 // Búsqueda y consulta pública de tutores. Solo expone campos públicos
 // (nunca correo ni hoja de vida) y calcula la disponibilidad REAL:
@@ -76,8 +88,9 @@ export class TutorService {
 
   #publico(t, programadasDelTutor, resumen) {
     const materias = Array.isArray(t.materias) ? t.materias : [];
-    const disponibilidad = (Array.isArray(t.disponibilidad) ? t.disponibilidad : [])
-      .filter((b) => b && b.fecha && b.horaInicio && b.horaFin)
+    const bloques = (Array.isArray(t.disponibilidad) ? t.disponibilidad : [])
+      .filter((b) => b && b.fecha && b.horaInicio && b.horaFin);
+    const disponibilidad = bloques
       .filter((b) => !this.reloj.yaPaso(b.fecha, b.horaFin))
       .filter((b) => !programadasDelTutor.some((p) => seSolapan(b, p)))
       .sort((a, b) => `${a.fecha}T${a.horaInicio}`.localeCompare(`${b.fecha}T${b.horaInicio}`))
@@ -88,9 +101,13 @@ export class TutorService {
       nombre: t.nombre || "Tutor",
       apellido: t.apellido || "",
       titulo: t.titulo || "",
+      institucion: t.institucion || "",
       ciudad: t.ciudad || "",
       presentacion: t.presentacion || "",
       materias,
+      modalidad: modalidadDe(t, bloques),
+      nivelEnsenanza: t.nivelEnsenanza || "",
+      experiencia: Number.isInteger(t.experiencia) ? t.experiencia : null,
       tarifa: Number(t.tarifa) || 0,
       fotoURL: t.fotoURL || "",
       promedio: resumen?.promedio ?? 0,
@@ -106,13 +123,10 @@ export class TutorService {
     }
     if (f.materia && !t.materias.some((m) => normalizar(m) === f.materia)) return false;
     if (f.ciudad && !normalizar(t.ciudad).includes(f.ciudad)) return false;
-    // Fecha y modalidad se evalúan sobre el MISMO bloque.
-    if (f.fecha || f.modalidad) {
-      const hay = t.disponibilidad.some(
-        (b) => (!f.fecha || b.fecha === f.fecha) && (!f.modalidad || normalizar(b.modalidad).includes(f.modalidad))
-      );
-      if (!hay) return false;
-    }
+    // La modalidad sale del perfil del tutor: «Presencial» incluye a «Virtual y presencial».
+    if (f.modalidad && !normalizar(t.modalidad).includes(f.modalidad)) return false;
+    // La fecha sí depende de la agenda: el tutor debe tener un bloque libre ese día.
+    if (f.fecha && !t.disponibilidad.some((b) => b.fecha === f.fecha)) return false;
     return true;
   }
 }

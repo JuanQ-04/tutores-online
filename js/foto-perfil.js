@@ -4,16 +4,10 @@
 // reduce a 256×256 px y se guarda como texto (data URL, ~15–40 KB) en el campo
 // «fotoURL» de su documento en la colección «usuarios».
 //
-// Se guarda en Firestore y no en Firebase Storage para que funcione sin
-// configurar Storage (que hoy exige el plan Blaze). Si más adelante migras a
-// Storage, solo cambia guardarFotoPerfil().
+// La API lo guarda en la base de datos (no en Firebase Storage, que hoy exige el plan
+// Blaze). Si más adelante migras a Storage, solo cambia guardarFotoPerfil().
 
-import { auth, db } from "./firebase-config.js";
-import {
-  doc,
-  getDoc,
-  updateDoc
-} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { api } from "./api.js";
 
 const LADO = 256;                       // px del lado de la foto final
 const MAX_ARCHIVO = 8 * 1024 * 1024;    // 8 MB de imagen original
@@ -123,19 +117,10 @@ export async function procesarImagen(file) {
   return url;
 }
 
-/** Lee la foto guardada de un usuario (cadena vacía si no tiene). */
-export async function leerFotoPerfil(uid) {
-  const snap = await getDoc(doc(db, "usuarios", uid));
-  const foto = snap.exists() ? snap.data().fotoURL : "";
-  return esFotoValida(foto) ? foto : "";
-}
-
-/** Guarda la foto en el documento del usuario que tiene la sesión abierta. */
+/** Guarda la foto del usuario que tiene la sesión abierta (a través de la API). */
 export async function guardarFotoPerfil(fotoURL) {
-  const usuario = auth.currentUser;
-  if (!usuario) throw new Error("Tu sesión expiró. Vuelve a iniciar sesión.");
   if (!esFotoValida(fotoURL)) throw new Error("La imagen no es válida.");
-  await updateDoc(doc(db, "usuarios", usuario.uid), { fotoURL });
+  await api.guardarFoto(fotoURL);
 }
 
 /**
@@ -165,7 +150,7 @@ export function activarSelectorFoto(boton, alElegir, alError) {
       await alElegir(url);
     } catch (error) {
       console.error("Error al actualizar la foto:", error);
-      const mensaje = error && error.message && !/permission|insufficient|firestore/i.test(error.message)
+      const mensaje = error && error.message
         ? error.message
         : "No se pudo guardar la foto. Revisa tu conexión e inténtalo de nuevo.";
       if (alError) alError(mensaje);

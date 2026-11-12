@@ -1,3 +1,12 @@
+// Falla de configuración del servidor (por ejemplo, faltan las credenciales de Firebase).
+// No es culpa del usuario: sale como 500 y el detalle queda en el log del servidor.
+export class ErrorConfiguracion extends Error {
+  constructor(mensaje) {
+    super(mensaje);
+    this.name = "ErrorConfiguracion";
+  }
+}
+
 // Errores de dominio. El manejador global los convierte en respuestas HTTP.
 export class ErrorApp extends Error {
   constructor(status, codigo, mensaje, detalles) {

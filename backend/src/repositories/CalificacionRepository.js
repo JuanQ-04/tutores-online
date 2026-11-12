@@ -17,6 +17,37 @@ export class CalificacionRepository {
     }
   }
 
+  async obtenerPorId(id) {
+    const doc = await this.#col.doc(id).get();
+    return doc.exists ? aObjeto(doc) : null;
+  }
+
+  // Moderación del administrador: estrellas, visibilidad y retroalimentación.
+  async moderar(id, cambios, adminId) {
+    await this.#col.doc(id).update({
+      ...cambios,
+      editadaPorAdmin: adminId,
+      editadaEn: FieldValue.serverTimestamp()
+    });
+  }
+
+  // Todas las que dio un estudiante (visibles u ocultas).
+  async listarPorEstudiante(uid) {
+    const snap = await this.#col.where("estudianteId", "==", uid).get();
+    return snap.docs.map(aObjeto).sort(porFechaDesc);
+  }
+
+  // Todas las que recibió un tutor (el tutor ve también las que el administrador ocultó).
+  async listarPorTutor(uid) {
+    const snap = await this.#col.where("tutorId", "==", uid).get();
+    return snap.docs.map(aObjeto).sort(porFechaDesc);
+  }
+
+  async listarTodas() {
+    const snap = await this.#col.get();
+    return snap.docs.map(aObjeto).sort(porFechaDesc);
+  }
+
   async listarVisiblesPorTutor(tutorId, limite = 50) {
     const snap = await this.#col
       .where("tutorId", "==", tutorId)

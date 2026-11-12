@@ -35,4 +35,9 @@ export class SolicitudRepository {
     const snap = await this.#col.where("tutorId", "==", uid).get();
     return snap.docs.map(aObjeto).sort(porFechaDesc);
   }
+
+  async listarTodas() {
+    const snap = await this.#col.get();
+    return snap.docs.map(aObjeto).sort(porFechaDesc);
+  }
 }

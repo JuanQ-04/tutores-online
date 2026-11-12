@@ -2466,3 +2466,14 @@ a.user-avatar {
 .sessions-empty [data-reintentar]:hover {
   border-color: var(--color-primary);
 }
+
+/* Notificaciones que se abren con clic */
+.notification-entry > .aviso-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-entry .aviso-item h2::before,
+.notification-entry .aviso-item h3::before {
+  display: none; /* el punto de «sin leer» ya lo pinta .notification-marker */
+}

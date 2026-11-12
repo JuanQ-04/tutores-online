@@ -1,27 +1,16 @@
 /* js/admin.js — Panel del administrador
-   Navegación por #. Conectado a Firestore: Mi perfil, Calificaciones y
-   Tutorías (casos de soporte = colección «mensajesSoporte»).
-   Tutores (solicitudes + hoja de vida, aprobar/rechazar) y el contador de
-   pendientes del Resumen también son reales (colección «usuarios»,
-   rol = tutor, y «hojasDeVida»).
-   Estadísticas del Resumen (tutorías, solicitudes, calificaciones, usuarios) reales.
-   Usuarios, Materias, Actividad reciente y Notificaciones también son reales
-   (se arman con usuarios, tutorías, calificaciones y mensajes de soporte).
+   Navegación por #. Todos los datos viajan por la API (js/api.js, rutas /api/admin/*);
+   este panel nunca habla directo con la base de datos. Son reales: Mi perfil,
+   Calificaciones (moderación), Soporte (casos y respuestas), Tutores (solicitudes,
+   hoja de vida, aprobar/rechazar y actualizaciones de datos), Usuarios (suspender/activar),
+   Materias (ver y agregar), estadísticas del Resumen, Actividad reciente y Notificaciones.
    Seguridad (contraseña) la maneja js/configuracion.js.
    Se carga como módulo: <script type="module" src="../js/admin.js"></script> */
 
-import { auth, db } from "./firebase-config.js";
-import {
-  doc,
-  getDoc,
-  updateDoc,
-  collection,
-  getDocs,
-  query,
-  where,
-  serverTimestamp,
-  onSnapshot
-} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { auth } from "./firebase-config.js";
+import { api, aMillis, sondear, sonIguales } from "./api.js";
+import { cargarMaterias, materiasActuales, agregarMateria, idMateria, nombreMateria } from "./materias.js";
+import { crearBandeja, htmlAviso, activarClics } from "./notificaciones.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 import {
   pintarAvatar,
@@ -44,11 +33,17 @@ function estrellas(n) {
   return "★".repeat(v) + "☆".repeat(5 - v);
 }
 
+// La API entrega las fechas como texto: "2026-05-20" (solo día) o ISO completo
+// ("2026-05-20T15:30:00.000Z", marcas de tiempo del servidor).
+function aFecha(valor) {
+  if (typeof valor !== "string" || !valor) return null;
+  const fecha = /^\d{4}-\d{2}-\d{2}$/.test(valor) ? new Date(`${valor}T12:00:00`) : new Date(valor);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
+
 function fechaCorta(valor) {
-  const fecha = typeof valor?.toDate === "function" ? valor.toDate()
-    : typeof valor === "string" ? new Date(`${valor.slice(0, 10)}T12:00:00`)
-    : null;
-  if (!fecha || Number.isNaN(fecha.getTime())) return "";
+  const fecha = aFecha(valor);
+  if (!fecha) return "";
   return fecha.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
 }
 
@@ -58,43 +53,25 @@ function iniciales(nombre, porDefecto = "AD") {
 }
 
 function detalleError(err) {
-  return err?.code === "permission-denied"
-    ? "Firestore no lo permite (permission-denied): revisa que publicaste las reglas nuevas y que tu usuario tiene rol «admin»."
-    : "Revisa tu conexión e inténtalo de nuevo.";
+  if (err?.status === 403) return "Tu usuario no tiene permiso de administrador.";
+  return err?.message || "Revisa tu conexión e inténtalo de nuevo."; // los errores de la API ya vienen en español
 }
 
 /* ---------- Catálogo de materias ----------
-   Mismas materias que las casillas de registro-tutor.html. En los tutores se
-   guardan como «slug» (matematicas) y en las tutorías como texto (Matemáticas),
-   así que todo se compara normalizado. */
-const MATERIAS = [
-  { id: "matematicas", nombre: "Matemáticas" },
-  { id: "fisica", nombre: "Física" },
-  { id: "quimica", nombre: "Química" },
-  { id: "programacion", nombre: "Programación" },
-  { id: "idiomas", nombre: "Idiomas" },
-  { id: "estadistica", nombre: "Estadística" }
-];
-
+   Viene de la API (js/materias.js): las de base más las que agrega el administrador.
+   En los tutores se guardan como «slug» (matematicas) y en las tutorías como texto
+   (Matemáticas), así que todo se compara por identificador. */
 function normMateria(valor) {
   return String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 }
 
-function materiaId(valor) {
-  const n = normMateria(valor);
-  if (n === "estadisticas") return "estadistica";
-  return MATERIAS.find((m) => m.id === n || normMateria(m.nombre) === n)?.id || n;
-}
+const materiaId = idMateria;
 
 function materiaNombre(valor) {
-  const id = materiaId(valor);
-  return MATERIAS.find((m) => m.id === id)?.nombre || String(valor || "").trim() || "Sin materia";
+  return String(valor || "").trim() ? nombreMateria(valor) : "Sin materia";
 }
 
-function fechaDe(valor) {
-  const f = typeof valor?.toDate === "function" ? valor.toDate() : null;
-  return f && !Number.isNaN(f.getTime()) ? f : null;
-}
+const fechaDe = aFecha;
 
 function tiempoRelativo(fecha) {
   const min = Math.floor((Date.now() - fecha.getTime()) / 60000);
@@ -112,7 +89,7 @@ const ADMIN_SECTIONS = [
   { id: "usuarios", label: "Usuarios" },
   { id: "tutores", label: "Tutores" },
   { id: "materias", label: "Materias" },
-  { id: "tutorias", label: "Tutorías" },
+  { id: "soporte", label: "Soporte" },
   { id: "calificaciones", label: "Calificaciones" },
   { id: "notificaciones", label: "Notificaciones" },
   { id: "perfil", label: "Mi perfil" },
@@ -120,14 +97,14 @@ const ADMIN_SECTIONS = [
   { id: "ayuda", label: "Centro de ayuda" }
 ];
 
-/* Datos reales (Firestore) */
+/* Datos reales (API) */
 let adminUid = null;
-let cancelarEscuchasAdmin = [];
+let detenerSondeo = null;   // cancela la actualización periódica del panel
 let adminProfile = { nombre: "", apellido: "", email: "", fotoURL: "" };
-let ratings = [];            // colección «calificaciones»
+let ratings = [];            // calificaciones (GET /admin/calificaciones)
 let ratingsEstado = "cargando";
 let ratingsError = null;
-let cases = [];              // colección «mensajesSoporte»
+let cases = [];              // casos de soporte (GET /admin/soporte)
 let casesEstado = "cargando";
 let casesError = null;
 let editingRatingId = null;
@@ -135,9 +112,14 @@ let tutors = [];             // usuarios con rol «tutor» que ya enviaron solic
 let tutorsEstado = "cargando";
 let tutorsError = null;
 const tutorsGuardando = new Set(); // evita doble clic mientras se guarda
-let statsTutorias = [];      // colección «tutorias» (todas)
-let statsSolicitudes = [];   // colección «solicitudes» (todas)
-let statsUsuarios = [];      // colección «usuarios» (todos)
+let cambios = [];            // solicitudes de actualización de datos (GET /admin/cambios-perfil)
+let cambiosEstado = "cargando";
+let cambiosError = null;
+let cambioAbierto = null;    // id del tutor cuya solicitud se está revisando en el diálogo
+let casoAbierto = null;      // id del caso de soporte abierto en el diálogo
+let statsTutorias = [];      // todas las tutorías
+let statsSolicitudes = [];   // todas las solicitudes
+let statsUsuarios = [];      // todos los usuarios
 let statsEstado = "cargando";
 let statsError = null;
 
@@ -155,6 +137,7 @@ function getSectionLabel(hash) {
 }
 
 function showSection(id) {
+  if (id === "tutorias") id = "soporte"; // enlaces viejos: los casos de soporte estaban en «Tutorías»
   if (!ADMIN_SECTIONS.some((s) => s.id === id)) id = "resumen";
 
   currentSection = id;
@@ -222,14 +205,15 @@ function renderStats() {
     $("#admin-stat-users").textContent = "…";
   }
   $("#admin-stat-tutors").textContent = tutorsVerified;
-  $("#admin-stat-materias").textContent = MATERIAS.length;
+  $("#admin-stat-materias").textContent = materiasActuales().length;
   const openCases = cases.filter((c) => caseStatus(c) === "open").length;
-  $("#admin-stat-pending").textContent = pendingTutors + openCases;
+  $("#admin-stat-pending").textContent = pendingTutors + cambiosPendientes().length + openCases;
 }
 
 function renderPendingList() {
   const container = $("#admin-pending-list");
   const pendientes = tutors.filter((t) => t.status === "pending");
+  const actualizaciones = cambiosPendientes();
 
   if (tutorsEstado === "cargando") {
     container.innerHTML = '<p class="admin-empty">Cargando solicitudes…</p>';
@@ -239,25 +223,25 @@ function renderPendingList() {
     container.innerHTML = `<p class="admin-empty">No se pudieron cargar las solicitudes. ${escapeHTML(detalleError(tutorsError))}</p>`;
     return;
   }
-  if (pendientes.length === 0) {
+  if (pendientes.length === 0 && actualizaciones.length === 0) {
     container.innerHTML = '<p class="admin-empty">No hay pendientes por revisar.</p>';
     return;
   }
 
-  container.innerHTML = pendientes
-    .map(
-      (t) => `
+  const item = (titulo, detalle) => `
       <div class="admin-pending-item">
         <svg class="icon" aria-hidden="true"><use href="#icon-award"></use></svg>
         <div>
-          <strong>Solicitud de ${escapeHTML(t.name)}</strong>
-          <p>Verificación como tutor de ${escapeHTML(t.subject || "sin materia")}</p>
+          <strong>${escapeHTML(titulo)}</strong>
+          <p>${escapeHTML(detalle)}</p>
         </div>
         <span class="admin-status pending">Pendiente</span>
-      </div>
-    `
-    )
-    .join("");
+      </div>`;
+
+  container.innerHTML = [
+    ...pendientes.map((t) => item(`Solicitud de ${t.name}`, `Verificación como tutor de ${t.subject || "sin materia"}`)),
+    ...actualizaciones.map((s) => item(`Actualización de ${s.tutorNombre || "un tutor"}`, `Cambia: ${etiquetasCambio(s).join(", ")}`))
+  ].join("");
 }
 
 function renderActivity() {
@@ -276,6 +260,12 @@ function renderActivity() {
     add("award", `${t.name} solicitó verificación como tutor`, t.solicitudEnviadaEn);
     if (t.revisadoEn) {
       add("check", `Solicitud de ${t.name} ${t.status === "rejected" ? "rechazada" : "aprobada"}`, t.revisadoEn);
+    }
+  });
+  cambios.forEach((s) => {
+    add("award", `${s.tutorNombre || "Un tutor"} pidió actualizar sus datos`, s.creadaEn);
+    if (s.revisadaEn) {
+      add("check", `Actualización de ${s.tutorNombre || "un tutor"} ${s.estado === "rechazada" ? "rechazada" : "aprobada"}`, s.revisadaEn);
     }
   });
   statsTutorias.forEach((t) => {
@@ -378,7 +368,7 @@ function userView(u) {
 
 async function setUserActive(uid, activo) {
   try {
-    await updateDoc(doc(db, "usuarios", uid), { activo });
+    await api.admin.cambiarActivo(uid, activo);
     const u = statsUsuarios.find((x) => x.id === uid);
     if (u) u.activo = activo;
     $("#admin-user-dialog").close();
@@ -430,20 +420,21 @@ function openUserDetail(userId) {
 }
 
 /* ---------- Renderizado: Tutores ---------- */
-/* ---------- Estadísticas (Firestore: tutorias, solicitudes, usuarios, calificaciones) ---------- */
+/* ---------- Estadísticas (API: tutorías, solicitudes, usuarios) ---------- */
 async function loadStats() {
   statsEstado = "cargando";
   renderAnalytics();
   try {
     const [tut, sol, usu] = await Promise.all([
-      getDocs(collection(db, "tutorias")),
-      getDocs(collection(db, "solicitudes")),
-      getDocs(collection(db, "usuarios"))
+      api.admin.tutorias(),
+      api.admin.solicitudes(),
+      api.admin.usuarios()
     ]);
-    statsTutorias = tut.docs.map((d) => ({ id: d.id, ...d.data() }));
-    statsSolicitudes = sol.docs.map((d) => ({ id: d.id, ...d.data() }));
-    statsUsuarios = usu.docs.map((d) => ({ id: d.id, ...d.data() }));
+    statsTutorias = tut;
+    statsSolicitudes = sol;
+    statsUsuarios = usu;
     statsEstado = "listo";
+    statsError = null;
   } catch (err) {
     console.error("No se pudieron cargar las estadísticas:", err);
     statsEstado = "error";
@@ -558,7 +549,7 @@ function renderAnalytics() {
     </div>`;
 }
 
-/* ---------- Tutores (Firestore: usuarios con rol «tutor») ----------
+/* ---------- Tutores (API: usuarios con rol «tutor») ----------
    Ciclo de vida del campo «estado»: incompleto → pendiente → aprobado | rechazado.
    «incompleto» (aún no envió el formulario) no aparece en el panel. */
 const TUTOR_STATUS_MAP = {
@@ -586,15 +577,13 @@ async function loadTutors() {
   renderTutors();
   renderPendingList();
   try {
-    const snap = await getDocs(query(collection(db, "usuarios"), where("rol", "==", "tutor")));
-    tutors = snap.docs
-      .map((d) => {
-        const x = d.data();
+    const usuarios = await api.admin.usuarios("tutor");
+    tutors = usuarios
+      .map((x) => {
         const materias = Array.isArray(x.materias) ? x.materias : [];
         const name = `${x.nombre || ""} ${x.apellido || ""}`.trim() || x.email || "Tutor";
         return {
-          id: d.id,
-          ...x,
+          ...x, // incluye el id
           materias,
           name,
           email: x.email || "",
@@ -604,8 +593,9 @@ async function loadTutors() {
         };
       })
       .filter((t) => t.status) // «incompleto» todavía no es una solicitud
-      .sort((a, b) => (b.solicitudEnviadaEn?.toMillis?.() ?? 0) - (a.solicitudEnviadaEn?.toMillis?.() ?? 0));
+      .sort((a, b) => aMillis(b.solicitudEnviadaEn) - aMillis(a.solicitudEnviadaEn));
     tutorsEstado = "listo";
+    tutorsError = null;
   } catch (err) {
     console.error("No se pudieron cargar los tutores:", err);
     tutorsEstado = "error";
@@ -627,12 +617,12 @@ function populateTutorSubjectFilter() {
   const actual = select.value || "all";
   select.innerHTML =
     '<option value="all">Todas</option>' +
-    MATERIAS.map((m) => `<option value="${m.id}">${m.nombre}</option>`).join("");
-  select.value = MATERIAS.some((m) => m.id === actual) ? actual : "all";
+    materiasActuales().map((m) => `<option value="${escapeHTML(m.id)}">${escapeHTML(m.nombre)}</option>`).join("");
+  select.value = materiasActuales().some((m) => m.id === actual) ? actual : "all";
 }
 
 function renderTutorTabs() {
-  const counts = { pending: 0, verified: 0, rejected: 0 };
+  const counts = { pending: 0, verified: 0, rejected: 0, updates: cambiosPendientes().length };
   tutors.forEach((t) => {
     counts[t.status] = (counts[t.status] || 0) + 1;
   });
@@ -669,6 +659,11 @@ function renderTutors() {
   const search = $("#admin-tutor-search").value.trim().toLowerCase();
   const subject = $("#admin-tutor-subject").value;
   const grid = $("#admin-tutor-grid");
+
+  if (tutorTab === "updates") {
+    renderCambios(grid, search, subject);
+    return;
+  }
 
   if (tutorsEstado === "cargando") {
     grid.innerHTML = '<p class="admin-empty">Cargando tutores…</p>';
@@ -731,13 +726,11 @@ async function setTutorStatus(tutorId, nuevoEstado, pastTense) {
 
   tutorsGuardando.add(tutorId);
   try {
-    // Solo el admin puede cambiar «estado» (lo exigen las reglas de Firestore).
-    await updateDoc(doc(db, "usuarios", tutorId), {
-      estado: nuevoEstado,
-      revisadoPor: adminUid,
-      revisadoEn: serverTimestamp()
-    });
+    // Solo un administrador puede cambiar «estado»: lo exige la API (rol «admin»).
+    await api.admin.revisarTutor(tutorId, nuevoEstado);
     tutor.estado = nuevoEstado;
+    tutor.revisadoPor = adminUid;
+    tutor.revisadoEn = new Date().toISOString();
     tutor.status = tutorStatusFromEstado(nuevoEstado);
     renderTutors();
     renderStats();
@@ -756,25 +749,24 @@ async function setTutorStatus(tutorId, nuevoEstado, pastTense) {
   }
 }
 
-// Abre la hoja de vida (PDF guardado en hojasDeVida/{uid}) en una pestaña nueva.
-async function verHojaVida(tutorId) {
+// Abre la hoja de vida (PDF que el tutor subió; la API la entrega como data URL) en una pestaña nueva.
+async function verHojaVida(tutorId, { pendiente = false } = {}) {
   // La pestaña se abre ya, dentro del clic, para que el navegador no la bloquee.
   const ventana = window.open("", "_blank");
   try {
-    const snap = await getDoc(doc(db, "hojasDeVida", tutorId));
-    if (!snap.exists() || !snap.data().dataURL) {
-      ventana?.close();
-      showToast("Este tutor no tiene un PDF guardado.");
-      return;
-    }
-    const blob = await (await fetch(snap.data().dataURL)).blob();
+    const hoja = await api.admin.hojaDeVida(tutorId, { pendiente });
+    const blob = await (await fetch(hoja.dataURL)).blob();
     const url = URL.createObjectURL(blob);
     if (ventana) ventana.location.href = url;
     else window.open(url, "_blank");
     setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
   } catch (err) {
-    console.error("No se pudo abrir la hoja de vida:", err);
     ventana?.close();
+    if (err?.status === 404) {
+      showToast(pendiente ? "Esa solicitud ya no tiene un PDF pendiente." : "Este tutor no tiene un PDF guardado.");
+      return;
+    }
+    console.error("No se pudo abrir la hoja de vida:", err);
     showToast(`No se pudo abrir la hoja de vida. ${detalleError(err)}`);
   }
 }
@@ -785,21 +777,21 @@ function openTutorDetail(tutorId) {
 
   const r = tutorRating(tutor.id);
   const dialog = $("#admin-tutor-dialog");
-  const lista = (arr) => escapeHTML(arr?.length ? arr.join(", ") : "—");
-  const tarifa = Number(tutor.tarifa) > 0
-    ? `$${Number(tutor.tarifa).toLocaleString("es-CO")} COP / hora`
-    : "—";
 
   $("#admin-tutor-detail").innerHTML = `
     <dl class="admin-detail-list">
       <dt>Nombre</dt><dd>${escapeHTML(tutor.name)}</dd>
       <dt>Correo</dt><dd>${escapeHTML(tutor.email)}</dd>
       <dt>Título / carrera</dt><dd>${escapeHTML(tutor.titulo || "—")}</dd>
+      <dt>Nivel de estudios</dt><dd>${escapeHTML(textoCambio("nivelEstudios", tutor.nivelEstudios))}</dd>
       <dt>Institución</dt><dd>${escapeHTML(tutor.institucion || "—")}</dd>
       <dt>Ciudad</dt><dd>${escapeHTML(tutor.ciudad || "—")}</dd>
-      <dt>Materias</dt><dd>${lista(tutor.materias)}</dd>
-      <dt>Disponibilidad</dt><dd>${lista(tutor.franjas)}</dd>
-      <dt>Tarifa</dt><dd>${escapeHTML(tarifa)}</dd>
+      <dt>Materias</dt><dd>${escapeHTML(textoCambio("materias", tutor.materias))}</dd>
+      <dt>Enseña a</dt><dd>${escapeHTML(textoCambio("nivelEnsenanza", tutor.nivelEnsenanza))}</dd>
+      <dt>Experiencia</dt><dd>${escapeHTML(textoCambio("experiencia", tutor.experiencia))}</dd>
+      <dt>Modalidad</dt><dd>${escapeHTML(textoCambio("modalidad", tutor.modalidad))}</dd>
+      <dt>Franjas</dt><dd>${escapeHTML(textoCambio("franjas", tutor.franjas))}</dd>
+      <dt>Tarifa</dt><dd>${escapeHTML(textoCambio("tarifa", tutor.tarifa))}</dd>
       <dt>Calificación</dt><dd>${r.total ? `${r.promedio} (${r.total} opiniones)` : "Sin calificaciones"}</dd>
       <dt>Solicitud enviada</dt><dd>${escapeHTML(fechaCorta(tutor.solicitudEnviadaEn) || "—")}</dd>
       <dt>Estado</dt><dd><span class="admin-status ${tutor.status}">${TUTOR_STATUS_LABELS[tutor.status]}</span></dd>
@@ -822,7 +814,248 @@ function openTutorDetail(tutorId) {
   dialog.showModal();
 }
 
+/* ---------- Actualizaciones de datos de los tutores (API: /admin/cambios-perfil) ----------
+   Un tutor aprobado no edita sus datos profesionales: envía una solicitud y aquí se
+   aprueba o se rechaza. Mientras está pendiente, el perfil y la búsqueda no cambian. */
+const ETIQUETAS_CAMBIO = {
+  titulo: "Carrera o formación", nivelEstudios: "Nivel de estudios", institucion: "Institución",
+  materias: "Materias", nivelEnsenanza: "Nivel al que enseña", experiencia: "Experiencia",
+  modalidad: "Modalidad", ciudad: "Ciudad", tarifa: "Tarifa por hora", franjas: "Franjas",
+  presentacion: "Presentación", hojaVidaPDF: "Hoja de vida"
+};
+const NIVELES_ESTUDIO = {
+  tecnico: "Técnico o tecnólogo", "pregrado-curso": "Pregrado en curso", pregrado: "Pregrado finalizado", posgrado: "Posgrado"
+};
+const NIVELES_ENSENANZA = { secundaria: "Secundaria", universitario: "Universitario", ambos: "Secundaria y universitario" };
+const NOMBRES_FRANJA = { manana: "Mañana", tarde: "Tarde", noche: "Noche" };
+
+function textoCambio(campo, valor) {
+  if (valor === undefined || valor === null || valor === "" || (Array.isArray(valor) && !valor.length)) return "—";
+  switch (campo) {
+    case "materias": return valor.map(nombreMateria).join(", ");
+    case "franjas": return valor.map((f) => NOMBRES_FRANJA[f] || f).join(", ");
+    case "nivelEstudios": return NIVELES_ESTUDIO[valor] || String(valor);
+    case "nivelEnsenanza": return NIVELES_ENSENANZA[valor] || String(valor);
+    case "experiencia": return `${valor} ${Number(valor) === 1 ? "año" : "años"}`;
+    case "tarifa": return `$${Number(valor).toLocaleString("es-CO")} COP / hora`;
+    default: return String(valor);
+  }
+}
+
+const idCambio = (s) => s.tutorId || s.id;
+const cambiosPendientes = () => cambios.filter((s) => s.estado === "pendiente");
+const etiquetasCambio = (s) => Object.keys(s.cambios || {}).map((c) => ETIQUETAS_CAMBIO[c] || c);
+const tutorDeCambio = (s) => tutors.find((t) => t.id === idCambio(s));
+
+async function loadCambios() {
+  try {
+    cambios = await api.admin.cambiosPerfil();
+    cambiosEstado = "listo";
+    cambiosError = null;
+  } catch (err) {
+    console.error("No se pudieron cargar las actualizaciones de datos:", err);
+    cambiosEstado = "error";
+    cambiosError = err;
+  }
+  renderTutors();
+  renderStats();
+  renderPendingList();
+  renderNotificationPreview();
+  renderNotificationFull();
+  renderActivity();
+}
+
+function renderCambios(grid, search, subject) {
+  if (cambiosEstado === "cargando") {
+    grid.innerHTML = '<p class="admin-empty">Cargando actualizaciones…</p>';
+    return;
+  }
+  if (cambiosEstado === "error") {
+    grid.innerHTML = `<p class="admin-empty">No se pudieron cargar las actualizaciones. ${escapeHTML(detalleError(cambiosError))}</p>`;
+    return;
+  }
+
+  const pendientes = cambiosPendientes();
+  const filtradas = pendientes.filter((s) => {
+    const materias = [...(tutorDeCambio(s)?.materias || []), ...(s.cambios?.materias || [])];
+    const coincideTexto = !search
+      || `${s.tutorNombre || ""} ${s.tutorEmail || ""}`.toLowerCase().includes(search)
+      || materias.some((m) => materiaNombre(m).toLowerCase().includes(search));
+    return coincideTexto && (subject === "all" || materias.some((m) => materiaId(m) === subject));
+  });
+
+  if (filtradas.length === 0) {
+    grid.innerHTML = `<p class="admin-empty">${pendientes.length ? "No hay actualizaciones con esos criterios." : "No hay actualizaciones pendientes."}</p>`;
+    return;
+  }
+
+  grid.innerHTML = filtradas
+    .map((s) => {
+      const nombre = s.tutorNombre || s.tutorEmail || "Tutor";
+      const enviada = fechaCorta(s.creadaEn);
+      return `
+      <article class="admin-tutor-card">
+        <div class="admin-tutor-card-top">
+          <span class="admin-initials">${escapeHTML(iniciales(nombre, "TU"))}</span>
+          <div>
+            <strong>${escapeHTML(nombre)}</strong>
+            <small>${escapeHTML(s.tutorEmail || "")}</small>
+          </div>
+        </div>
+        <p>Cambia: ${escapeHTML(etiquetasCambio(s).join(", "))}${enviada ? ` · Enviada: ${escapeHTML(enviada)}` : ""}</p>
+        <span class="admin-status pending">Pendiente</span>
+        <div class="admin-tutor-card-actions">
+          <button class="btn btn-primary" type="button" data-change-detail="${escapeHTML(idCambio(s))}">Revisar</button>
+        </div>
+      </article>`;
+    })
+    .join("");
+
+  $$("[data-change-detail]", grid).forEach((btn) =>
+    btn.addEventListener("click", () => abrirCambio(btn.dataset.changeDetail))
+  );
+}
+
+function abrirCambio(tutorId) {
+  const s = cambios.find((x) => idCambio(x) === tutorId);
+  if (!s) return;
+
+  cambioAbierto = tutorId;
+  const tutor = tutorDeCambio(s);
+  const nombre = s.tutorNombre || s.tutorEmail || "Tutor";
+
+  const filas = Object.entries(s.cambios || {}).map(([campo, nuevo]) => {
+    const actual = campo === "hojaVidaPDF"
+      ? (tutor?.hojaVidaPDF || (tutor?.tieneHojaVida ? "Archivo guardado" : ""))
+      : tutor?.[campo];
+    const propuesto = campo === "hojaVidaPDF" ? `${nuevo} (archivo nuevo)` : textoCambio(campo, nuevo);
+    return `<tr>
+      <td>${escapeHTML(ETIQUETAS_CAMBIO[campo] || campo)}</td>
+      <td>${escapeHTML(textoCambio(campo, actual))}</td>
+      <td class="is-new">${escapeHTML(propuesto)}</td>
+    </tr>`;
+  }).join("");
+
+  const nueva = s.cambios?.modalidad;
+  const aviso = nueva && nueva !== "Virtual y presencial"
+    ? `<p class="admin-change-note">Si apruebas, la disponibilidad del tutor se ajusta a «${escapeHTML(nueva)}»: `
+      + "se eliminan sus bloques de otra modalidad y los «Virtual y presencial» pasan a ser solo "
+      + `${escapeHTML(nueva.toLowerCase())}.</p>`
+    : "";
+
+  const enviada = fechaCorta(s.creadaEn);
+  $("#admin-change-detail").innerHTML = `
+    <p><strong>${escapeHTML(nombre)}</strong> · ${escapeHTML(s.tutorEmail || "")}${enviada ? ` · Enviada el ${escapeHTML(enviada)}` : ""}</p>
+    <table class="admin-change-table">
+      <thead><tr><th scope="col">Dato</th><th scope="col">Actual</th><th scope="col">Propuesto</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    ${aviso}
+    ${s.tieneHojaVida
+      ? `<p><button class="btn btn-secondary" type="button" id="admin-change-cv">Ver el PDF nuevo${s.cambios?.hojaVidaPDF ? ` (${escapeHTML(s.cambios.hojaVidaPDF)})` : ""}</button></p>`
+      : ""}
+  `;
+  $("#admin-change-cv")?.addEventListener("click", () => verHojaVida(tutorId, { pendiente: true }));
+
+  $("#admin-change-note").value = "";
+  $("#admin-change-error").textContent = "";
+  $("#admin-change-approve").disabled = false;
+  $("#admin-change-reject").disabled = false;
+  $("#admin-change-dialog").showModal();
+}
+
+async function resolverCambio(estado) {
+  const tutorId = cambioAbierto;
+  const s = cambios.find((x) => idCambio(x) === tutorId);
+  const clave = `cambio:${tutorId}`;
+  if (!s) {
+    // El tutor la canceló (o la respondió otra persona) mientras el diálogo estaba abierto.
+    $("#admin-change-dialog").close();
+    cambioAbierto = null;
+    showToast("Esa solicitud ya no está pendiente.");
+    return;
+  }
+  if (tutorsGuardando.has(clave)) return;
+
+  const botones = [$("#admin-change-approve"), $("#admin-change-reject")];
+  const nombre = s.tutorNombre || "el tutor";
+  $("#admin-change-error").textContent = "";
+  tutorsGuardando.add(clave);
+  botones.forEach((b) => { b.disabled = true; });
+  try {
+    await api.admin.resolverCambio(tutorId, estado, $("#admin-change-note").value.trim());
+    $("#admin-change-dialog").close();
+    cambioAbierto = null;
+    showToast(`Actualización de ${nombre} ${estado === "aprobada" ? "aprobada" : "rechazada"}.`);
+    await loadCambios();
+    if (estado === "aprobada") loadTutors(); // el perfil del tutor cambió
+  } catch (err) {
+    console.error("No se pudo responder la actualización:", err);
+    if (err?.status === 404 || err?.status === 409) {
+      // El tutor la canceló o la respondió otra persona: ya no hay nada que decidir aquí.
+      $("#admin-change-dialog").close();
+      cambioAbierto = null;
+      showToast(detalleError(err));
+      loadCambios();
+    } else {
+      $("#admin-change-error").textContent = `No se pudo guardar la decisión. ${detalleError(err)}`;
+      botones.forEach((b) => { b.disabled = false; });
+    }
+  } finally {
+    tutorsGuardando.delete(clave);
+  }
+}
+
+function bindCambios() {
+  $("#admin-change-approve").addEventListener("click", () => resolverCambio("aprobada"));
+  $("#admin-change-reject").addEventListener("click", () => resolverCambio("rechazada"));
+}
+
 /* ---------- Renderizado: Materias ---------- */
+// Se llama cuando el catálogo cambia (se agregó una materia) para que todo lo que lo usa se repinte.
+function refrescarMaterias() {
+  populateTutorSubjectFilter();
+  renderSubjectList();
+  renderStats();
+}
+
+// Agregar materia (API: POST /admin/materias). Queda disponible al instante en el registro
+// de tutores, en la búsqueda y en el panel del estudiante.
+function bindMateriaForm() {
+  const form = $("#admin-subject-form");
+  const input = $("#admin-subject-new");
+  const error = $("#admin-subject-form-error");
+  const boton = $("#admin-subject-add");
+
+  input.addEventListener("input", () => { error.textContent = ""; });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const nombre = input.value.trim().replace(/\s+/g, " ");
+    if (nombre.length < 2) {
+      error.textContent = "Escribe el nombre de la materia (mínimo 2 letras).";
+      input.focus();
+      return;
+    }
+
+    error.textContent = "";
+    boton.disabled = true;
+    try {
+      const materia = await api.admin.crearMateria(nombre);
+      agregarMateria(materia);
+      input.value = "";
+      $("#admin-subject-search").value = "";
+      activeSubjectId = materia.id;
+      refrescarMaterias();
+      showToast(`Materia «${materia.nombre}» agregada.`);
+    } catch (err) {
+      console.error("No se pudo agregar la materia:", err);
+      error.textContent = detalleError(err);
+    } finally {
+      boton.disabled = false;
+    }
+  });
+}
+
 function subjectData(id) {
   const tutoresDe = tutors.filter(
     (t) => t.status === "verified" && t.materias.some((m) => materiaId(m) === id)
@@ -847,7 +1080,7 @@ function renderSubjectList() {
   const search = normMateria($("#admin-subject-search").value);
   const list = $("#admin-subject-list");
 
-  const filtered = MATERIAS.filter((m) => !search || normMateria(m.nombre).includes(search));
+  const filtered = materiasActuales().filter((m) => !search || normMateria(m.nombre).includes(search));
 
   if (filtered.length === 0) {
     list.innerHTML = '<p class="admin-empty">No se encontraron materias.</p>';
@@ -858,9 +1091,9 @@ function renderSubjectList() {
     .map((m) => {
       const n = tutorsEstado === "listo" ? subjectData(m.id).tutores.length : null;
       return `
-      <button class="admin-subject-item ${activeSubjectId === m.id ? "is-active" : ""}" type="button" data-subject-id="${m.id}">
+      <button class="admin-subject-item ${activeSubjectId === m.id ? "is-active" : ""}" type="button" data-subject-id="${escapeHTML(m.id)}">
         <svg class="icon" aria-hidden="true"><use href="#icon-book"></use></svg>
-        <span>${m.nombre}</span>
+        <span>${escapeHTML(m.nombre)}</span>
         <small>${n === null ? "…" : `${n} ${n === 1 ? "tutor" : "tutores"}`}</small>
       </button>`;
     })
@@ -877,7 +1110,7 @@ function renderSubjectList() {
 }
 
 function showSubjectDetail(subjectId) {
-  const materia = MATERIAS.find((m) => m.id === subjectId);
+  const materia = materiasActuales().find((m) => m.id === subjectId);
   const units = $("#admin-subject-units");
   if (!materia) {
     $("#admin-subject-detail-title").textContent = "Selecciona una materia";
@@ -912,7 +1145,7 @@ function showSubjectDetail(subjectId) {
   `;
 }
 
-/* ---------- Tutorías: casos de soporte (Firestore: mensajesSoporte) ---------- */
+/* ---------- Tutorías: casos de soporte (API: /admin/soporte) ---------- */
 const CASE_STATUS = { abierto: "open", revision: "review", resuelto: "resolved" };
 const CASE_LABELS = { open: "Abierto", review: "En revisión", resolved: "Resuelto" };
 const ROLE_LABELS = { estudiante: "Estudiante", tutor: "Tutor", admin: "Administrador" };
@@ -925,10 +1158,9 @@ async function loadCases() {
   casesEstado = "cargando";
   renderCases();
   try {
-    const snap = await getDocs(collection(db, "mensajesSoporte"));
-    cases = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => (b.creadoEn?.toMillis?.() ?? 0) - (a.creadoEn?.toMillis?.() ?? 0));
+    cases = (await api.admin.soporte()).sort((a, b) => aMillis(b.creadoEn) - aMillis(a.creadoEn));
     casesEstado = "listo";
+    casesError = null;
   } catch (err) {
     console.error("No se pudieron cargar los casos:", err);
     casesEstado = "error";
@@ -949,8 +1181,17 @@ function renderCaseTabs() {
   });
 }
 
+// Casos abiertos junto a «Soporte» en el menú lateral.
+function renderSoporteBadge() {
+  const abiertos = cases.filter((c) => caseStatus(c) === "open").length;
+  const insignia = $("#admin-support-badge");
+  insignia.textContent = abiertos > 9 ? "9+" : String(abiertos);
+  insignia.hidden = abiertos === 0;
+}
+
 function renderCases() {
   renderCaseTabs();
+  renderSoporteBadge();
   const list = $("#admin-case-list");
 
   if (casesEstado === "cargando") {
@@ -981,7 +1222,7 @@ function renderCases() {
           <strong>${escapeHTML(c.asunto || "Sin asunto")}</strong>
           <span class="admin-status ${st}">${CASE_LABELS[st]}</span>
         </div>
-        <p>${escapeHTML(c.usuarioNombre || "Usuario")} · ${escapeHTML(ROLE_LABELS[c.rol] || "Usuario")}${c.creadoEn ? ` · ${escapeHTML(fechaCorta(c.creadoEn))}` : ""}</p>
+        <p>${escapeHTML(c.usuarioNombre || "Usuario")} · ${escapeHTML(ROLE_LABELS[c.rol] || "Usuario")}${c.creadoEn ? ` · ${escapeHTML(fechaCorta(c.creadoEn))}` : ""}${c.respuesta ? " · Respondido" : ""}</p>
         <div class="admin-case-card-actions">
           <button class="btn btn-secondary" type="button" data-case-detail="${escapeHTML(c.id)}">Ver detalle</button>
           ${st === "open" ? `<button class="btn btn-primary" type="button" data-case-move="${escapeHTML(c.id)}" data-to="revision">Pasar a revisión</button>` : ""}
@@ -995,7 +1236,7 @@ async function setCaseStatus(caseId, nuevoEstado) {
   const item = cases.find((c) => c.id === caseId);
   if (!item) return;
   try {
-    await updateDoc(doc(db, "mensajesSoporte", caseId), { estado: nuevoEstado, actualizadoEn: serverTimestamp() });
+    await api.admin.cambiarEstadoCaso(caseId, nuevoEstado);
     item.estado = nuevoEstado;
     renderCases();
     renderStats();
@@ -1009,6 +1250,7 @@ async function setCaseStatus(caseId, nuevoEstado) {
 function openCaseDetail(caseId) {
   const c = cases.find((x) => x.id === caseId);
   if (!c) return;
+  casoAbierto = caseId;
   const st = caseStatus(c);
   $("#admin-case-detail").innerHTML = `
     <dl class="admin-detail-list">
@@ -1018,19 +1260,24 @@ function openCaseDetail(caseId) {
       <dt>Fecha</dt><dd>${escapeHTML(fechaCorta(c.creadoEn) || "—")}</dd>
       <dt>Estado</dt><dd><span class="admin-status ${st}">${CASE_LABELS[st]}</span></dd>
       <dt>Mensaje</dt><dd class="admin-pre">${escapeHTML(c.mensaje || "")}</dd>
-    </dl>`;
+    </dl>
+    ${c.respuesta ? `<p class="admin-case-reply"><strong>Tu respuesta anterior</strong>${escapeHTML(c.respuesta)}</p>` : ""}`;
+
+  $("#admin-case-reply").value = "";
+  $("#admin-case-error").textContent = "";
+  $("#admin-case-send-resolve").hidden = st === "resolved";
+  $("#admin-case-send").textContent = st === "resolved" ? "Enviar respuesta" : "Solo responder";
   $("#admin-case-dialog").showModal();
 }
 
-/* ---------- Calificaciones (Firestore: calificaciones) ---------- */
+/* ---------- Calificaciones (API: moderación) ---------- */
 async function loadRatings() {
   ratingsEstado = "cargando";
   renderRatings();
   try {
-    const snap = await getDocs(collection(db, "calificaciones"));
-    ratings = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => (b.creadaEn?.toMillis?.() ?? 0) - (a.creadaEn?.toMillis?.() ?? 0));
+    ratings = (await api.admin.calificaciones()).sort((a, b) => aMillis(b.creadaEn) - aMillis(a.creadaEn));
     ratingsEstado = "listo";
+    ratingsError = null;
   } catch (err) {
     console.error("No se pudieron cargar las calificaciones:", err);
     ratingsEstado = "error";
@@ -1040,31 +1287,77 @@ async function loadRatings() {
   renderRatings();
 }
 
-function suscribirDatosAdmin() {
-  cancelarEscuchasAdmin.forEach((cancelar) => cancelar());
-  cancelarEscuchasAdmin = [
-    onSnapshot(collection(db, "tutorias"), (snap) => {
-      statsTutorias = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+/* Sin escuchas en tiempo real: cada 30 s (con la pestaña visible) se vuelven a pedir las
+   listas que cambian solas y solo se repinta lo que cambió. */
+function sincronizarDatosAdmin() {
+  if (detenerSondeo) detenerSondeo();
+  detenerSondeo = sondear(async () => {
+    const catalogoAntes = JSON.stringify(materiasActuales());
+    const [tutorias, calificaciones, soporte, usuariosTutor, actualizaciones] = await Promise.all([
+      api.admin.tutorias(),
+      api.admin.calificaciones(),
+      api.admin.soporte(),
+      api.admin.usuarios("tutor"),
+      api.admin.cambiosPerfil(),
+      cargarMaterias({ forzar: true }), // otro administrador pudo agregar materias
+      bandeja.cargar()                  // notificaciones nuevas (repinta sola la campana)
+    ]);
+    if (JSON.stringify(materiasActuales()) !== catalogoAntes) refrescarMaterias();
+
+    const ordenar = (lista, campo) => lista.sort((a, b) => aMillis(b[campo]) - aMillis(a[campo]));
+    const nuevasCalif = ordenar(calificaciones, "creadaEn");
+    const nuevosCasos = ordenar(soporte, "creadoEn");
+
+    const cambioTutorias = !sonIguales(tutorias, statsTutorias);
+    const cambioCalif    = !sonIguales(nuevasCalif, ratings);
+    const cambioCasos    = !sonIguales(nuevosCasos, cases);
+    const cambioTutores  = !sonIguales(huellaTutores(usuariosTutor), huellaTutores(tutors));
+    const cambioActualizaciones = !sonIguales(actualizaciones, cambios);
+
+    if (cambioTutorias) {
+      statsTutorias = tutorias;
       statsEstado = "listo";
       statsError = null;
-      renderAnalytics();
-      renderStats();
-      renderSubjectList();
-      renderActivity();
-    }, (err) => console.warn("No se pudieron sincronizar las tutorías:", err)),
-    onSnapshot(collection(db, "calificaciones"), (snap) => {
-      ratings = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (b.creadaEn?.toMillis?.() ?? 0) - (a.creadaEn?.toMillis?.() ?? 0));
+    }
+    if (cambioCalif) {
+      ratings = nuevasCalif;
       ratingsEstado = "listo";
       ratingsError = null;
       populateRatingFilters();
       renderRatings();
       renderTutors();
+    }
+    if (cambioCasos) {
+      cases = nuevosCasos;
+      casesEstado = "listo";
+      casesError = null;
+      renderCases();
+      renderNotificationPreview();
+      renderNotificationFull();
+    }
+    if (cambioActualizaciones) {
+      cambios = actualizaciones;
+      cambiosEstado = "listo";
+      cambiosError = null;
+    }
+    // hay solicitudes nuevas o alguien más decidió una (si aprobó una actualización, el perfil cambió)
+    if (cambioTutores || cambioActualizaciones) loadTutors();
+    if (cambioTutorias || cambioCalif || cambioCasos) {
       renderAnalytics();
+      renderStats();
       renderSubjectList();
       renderActivity();
-    }, (err) => console.warn("No se pudieron sincronizar las calificaciones:", err))
-  ];
+    }
+  });
+}
+
+// Huella de los tutores que ya enviaron solicitud (id, estado y cuenta activa), para
+// detectar cambios sin repintar. «incompleto» todavía no es una solicitud.
+function huellaTutores(lista) {
+  return lista
+    .filter((t) => tutorStatusFromEstado(t.estado))
+    .map((t) => `${t.id}|${t.estado}|${t.activo}`)
+    .sort();
 }
 
 function populateRatingFilters() {
@@ -1151,11 +1444,7 @@ async function saveRating(ratingId, cambios, mensaje) {
   const r = ratings.find((x) => x.id === ratingId);
   if (!r) return false;
   try {
-    await updateDoc(doc(db, "calificaciones", ratingId), {
-      ...cambios,
-      editadaPorAdmin: adminUid,
-      editadaEn: serverTimestamp()
-    });
+    await api.admin.moderarCalificacion(ratingId, cambios); // la API registra quién editó y cuándo
     Object.assign(r, cambios);
     renderRatings();
     showToast(mensaje);
@@ -1184,49 +1473,81 @@ function openRatingDialog(ratingId) {
   $("#admin-rating-dialog").showModal();
 }
 
-/* ---------- Notificaciones ---------- */
-// Pendientes reales: solicitudes de tutores por revisar y casos de soporte abiertos.
-function getNotifications() {
-  const solicitudes = tutors
-    .filter((t) => t.status === "pending")
-    .map((t) => ({
-      title: "Nueva solicitud de tutor",
-      detail: `${escapeHTML(t.name)} envió su solicitud de verificación.`,
-      time: fechaCorta(t.solicitudEnviadaEn) || "Reciente",
-      ms: t.solicitudEnviadaEn?.toMillis?.() ?? 0
-    }));
-  const casos = cases
-    .filter((c) => caseStatus(c) === "open")
-    .map((c) => ({
-      title: "Caso de soporte abierto",
-      detail: `${escapeHTML(c.usuarioNombre || "Un usuario")}: ${escapeHTML(c.asunto || "sin asunto")}`,
-      time: fechaCorta(c.creadoEn) || "Reciente",
-      ms: c.creadoEn?.toMillis?.() ?? 0
-    }));
-  return [...solicitudes, ...casos].sort((a, b) => b.ms - a.ms);
-}
+/* ---------- Notificaciones ----------
+   Se guardan en la base de datos (siguen ahí al volver a entrar). Cada una abre lo que anuncia:
+   un caso de soporte, una solicitud de tutor o una actualización de datos. */
+const bandeja = crearBandeja({
+  alCambiar: () => {
+    renderNotificationPreview();
+    renderNotificationFull();
+  }
+});
 
-function notificationItems(avisos) {
-  return avisos.length
-    ? avisos
-        .map((n) => `<li><h3>${n.title}</h3><p>${n.detail} · ${escapeHTML(n.time)}</p></li>`)
-        .join("")
-    : "<li><p>No tienes pendientes por atender.</p></li>";
+function listaAvisos(avisos, opciones) {
+  const { cargado, fallo } = bandeja.estado;
+  if (!avisos.length) {
+    const texto = !cargado
+      ? (fallo ? "No se pudieron cargar tus notificaciones." : "Cargando tus notificaciones…")
+      : "No tienes notificaciones.";
+    return `<li><p class="aviso-vacio">${texto}</p></li>`;
+  }
+  return avisos.map((a) => `<li>${htmlAviso(a, opciones)}</li>`).join("");
 }
 
 function renderNotificationPreview() {
-  const avisos = getNotifications();
-  $("#admin-notification-preview").innerHTML = notificationItems(avisos.slice(0, 3));
-  const unread = avisos.length;
-  $("#admin-notification-count").textContent = unread > 9 ? "9+" : unread;
-  $("#admin-notification-count").hidden = unread === 0;
+  const { avisos, sinLeer } = bandeja.estado;
+  $("#admin-notification-preview").innerHTML = listaAvisos(avisos.slice(0, 4), { compacto: true });
+  const punto = $("#admin-notification-count");
+  punto.textContent = sinLeer > 9 ? "9+" : String(sinLeer);
+  punto.hidden = sinLeer === 0;
+  $("#admin-notification-toggle").setAttribute(
+    "aria-label", sinLeer ? `Notificaciones, ${sinLeer} sin leer` : "Notificaciones"
+  );
 }
 
 function renderNotificationFull() {
-  $("#admin-notification-full").innerHTML = notificationItems(getNotifications());
+  $("#admin-notification-full").innerHTML = listaAvisos(bandeja.estado.avisos, { etiquetaTitulo: "h2" });
+  $("#admin-notifications-read-all").disabled = bandeja.estado.sinLeer === 0;
 }
 
-/* ---------- Perfil (Firestore: usuarios/{uid}) ---------- */
+// Va a una sección aunque ya estemos en ella (el evento hashchange no se dispara si el hash no cambia).
+function irASeccion(id) {
+  if (window.location.hash === `#${id}`) showSection(id);
+  else window.location.hash = id;
+}
+
+function abrirAviso(aviso) {
+  bandeja.leer(aviso.id);
+  $("#admin-notification-dropdown").hidden = true;
+  $("#admin-notification-toggle").setAttribute("aria-expanded", "false");
+
+  const { seccion, id, pestana } = aviso.destino || {};
+
+  if (seccion === "soporte") {
+    irASeccion("soporte");
+    if (!id) return;
+    if (cases.some((c) => c.id === id)) openCaseDetail(id);
+    else loadCases().then(() => (cases.some((c) => c.id === id) ? openCaseDetail(id) : showToast("Ese caso ya no está disponible.")));
+    return;
+  }
+
+  if (seccion === "tutores") {
+    irASeccion("tutores");
+    activarPestanaTutores(pestana === "updates" ? "updates" : "pending");
+    if (!id) return;
+    if (pestana === "updates") {
+      if (cambiosPendientes().some((s) => idCambio(s) === id)) abrirCambio(id);
+      else showToast("Esa actualización ya fue respondida.");
+    } else if (tutors.some((t) => t.id === id)) {
+      openTutorDetail(id);
+    }
+    return;
+  }
+
+  irASeccion(ADMIN_SECTIONS.some((s) => s.id === seccion) ? seccion : "resumen");
+}
+
+/* ---------- Perfil (API: GET/PATCH /usuarios/yo) ---------- */
 function renderProfile() {
   const fullName = `${adminProfile.nombre} ${adminProfile.apellido}`.trim();
   const avatar = iniciales(fullName);
@@ -1240,9 +1561,8 @@ function renderProfile() {
   top.setAttribute("aria-label", fullName ? `Mi perfil, ${fullName}` : "Mi perfil, administrador");
 }
 
-async function loadProfile(uid) {
-  const snap = await getDoc(doc(db, "usuarios", uid));
-  const d = snap.exists() ? snap.data() : {};
+async function loadProfile() {
+  const d = await api.miPerfil();
   adminProfile = {
     nombre: d.nombre || "",
     apellido: d.apellido || "",
@@ -1320,6 +1640,10 @@ function bindNotifications() {
     }
   });
 
+  activarClics($("#admin-notification-preview"), bandeja, abrirAviso);
+  activarClics($("#admin-notification-full"), bandeja, abrirAviso);
+  $("#admin-notifications-read-all").addEventListener("click", () => bandeja.leerTodas());
+
   $("#admin-notifications-back").addEventListener("click", () => {
     showSection("resumen");
     history.replaceState(null, "", "#resumen");
@@ -1332,17 +1656,19 @@ function bindUserFilters() {
   });
 }
 
+function activarPestanaTutores(tab) {
+  tutorTab = tab;
+  $$(".admin-tutor-tabs button").forEach((b) => {
+    const active = b.dataset.tutorStatus === tab;
+    b.classList.toggle("is-active", active);
+    b.setAttribute("aria-pressed", String(active));
+  });
+  renderTutors();
+}
+
 function bindTutorFilters() {
   $$(".admin-tutor-tabs button").forEach((button) => {
-    button.addEventListener("click", () => {
-      tutorTab = button.dataset.tutorStatus;
-      $$(".admin-tutor-tabs button").forEach((b) => {
-        const active = b === button;
-        b.classList.toggle("is-active", active);
-        b.setAttribute("aria-pressed", String(active));
-      });
-      renderTutors();
-    });
+    button.addEventListener("click", () => activarPestanaTutores(button.dataset.tutorStatus));
   });
 
   $("#admin-tutor-search").addEventListener("input", renderTutors);
@@ -1354,7 +1680,51 @@ function bindSubjectInteractions() {
   $("#admin-subject-search").addEventListener("input", renderSubjectList);
 }
 
+// Responde al usuario (le llega como notificación). Con «resolver» además cierra el caso;
+// si no, un caso abierto pasa a «en revisión» porque ya se está atendiendo.
+async function responderCaso(resolver) {
+  const caso = cases.find((c) => c.id === casoAbierto);
+  const error = $("#admin-case-error");
+  if (!caso) return;
+
+  const respuesta = $("#admin-case-reply").value.trim();
+  if (!respuesta) {
+    error.textContent = "Escribe la respuesta antes de enviarla.";
+    $("#admin-case-reply").focus();
+    return;
+  }
+
+  const cuerpo = { respuesta };
+  if (resolver) cuerpo.estado = "resuelto";
+  else if (caseStatus(caso) === "open") cuerpo.estado = "revision";
+
+  const botones = [$("#admin-case-send-resolve"), $("#admin-case-send")];
+  botones.forEach((b) => { b.disabled = true; });
+  error.textContent = "";
+  try {
+    await api.admin.responderCaso(caso.id, cuerpo);
+    caso.respuesta = respuesta;
+    if (cuerpo.estado) caso.estado = cuerpo.estado;
+    $("#admin-case-dialog").close();
+    casoAbierto = null;
+    renderCases();
+    renderStats();
+    showToast(`Respuesta enviada a ${caso.usuarioNombre || "el usuario"}.`);
+  } catch (err) {
+    console.error("No se pudo responder el caso:", err);
+    error.textContent = `No se pudo enviar la respuesta. ${detalleError(err)}`;
+  } finally {
+    botones.forEach((b) => { b.disabled = false; });
+  }
+}
+
 function bindCaseFilters() {
+  $("#admin-case-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    responderCaso(true);
+  });
+  $("#admin-case-send").addEventListener("click", () => responderCaso(false));
+
   $$(".admin-case-tabs button").forEach((button) => {
     button.addEventListener("click", () => {
       caseTab = button.dataset.caseStatus;
@@ -1424,7 +1794,7 @@ function bindProfile() {
       return;
     }
     try {
-      await updateDoc(doc(db, "usuarios", adminUid), { nombre: name, apellido: lastname });
+      await api.actualizarPerfil({ nombre: name, apellido: lastname });
       adminProfile.nombre = name;
       adminProfile.apellido = lastname;
       renderProfile();
@@ -1445,7 +1815,7 @@ function bindDialogs() {
   });
 }
 
-/* ---------- Foto de perfil (se guarda en usuarios/{uid}.fotoURL) ---------- */
+/* ---------- Foto de perfil (se guarda por la API en el perfil del usuario) ---------- */
 function bindFotoPerfil() {
   activarSelectorFoto(
     $("#admin-photo-edit"),
@@ -1471,6 +1841,8 @@ function init() {
   bindUserFilters();
   bindTutorFilters();
   bindSubjectInteractions();
+  bindMateriaForm();
+  bindCambios();
   bindCaseFilters();
   bindRatingFilters();
   bindProfile();
@@ -1479,6 +1851,7 @@ function init() {
   $("#admin-analytics-refresh").addEventListener("click", () => {
     loadStats();
     loadTutors();
+    loadCambios();
     loadRatings().then(() => { renderTutors(); renderAnalytics(); renderSubjectList(); renderActivity(); });
   });
 
@@ -1490,14 +1863,14 @@ function init() {
   // Solo un usuario con rol «admin» puede quedarse en este panel.
   onAuthStateChanged(auth, async (usuario) => {
     if (!usuario) {
-      cancelarEscuchasAdmin.forEach((cancelar) => cancelar());
-      cancelarEscuchasAdmin = [];
+      if (detenerSondeo) detenerSondeo();
+      detenerSondeo = null;
       adminUid = null;
       return; // auth.js redirige al login
     }
     adminUid = usuario.uid;
     try {
-      const datos = await loadProfile(usuario.uid);
+      const datos = await loadProfile();
       if (datos.rol !== "admin") {
         window.location.replace(datos.rol === "tutor" ? "tutor.html" : "estudiante.html");
         return;
@@ -1507,11 +1880,14 @@ function init() {
       $("#admin-profile-note").textContent = `No se pudo cargar tu perfil. ${detalleError(err)}`;
       return;
     }
+    bandeja.cargar();
+    cargarMaterias().then(refrescarMaterias); // catálogo real (las de base, más las que se agregaron)
     loadTutors();
+    loadCambios();
     loadStats();
     loadRatings().then(() => { renderTutors(); renderAnalytics(); renderSubjectList(); renderActivity(); }); // los promedios salen de las calificaciones
     loadCases();
-    suscribirDatosAdmin();
+    sincronizarDatosAdmin();
   });
 }
 

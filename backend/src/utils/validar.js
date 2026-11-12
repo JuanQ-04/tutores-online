@@ -39,3 +39,42 @@ export function entero(valor, campo, { min, max }) {
   }
   return valor;
 }
+
+// Igual que texto(), pero exige al menos una letra (rechaza "123" o "***").
+export function textoConLetras(valor, campo, opciones) {
+  const limpio = texto(valor, campo, opciones);
+  if (limpio && !/\p{L}/u.test(limpio)) {
+    throw new ErrorValidacion(`El campo «${campo}» debe contener letras`);
+  }
+  return limpio;
+}
+
+export function opcion(valor, permitidas, campo) {
+  if (!permitidas.includes(valor)) {
+    throw new ErrorValidacion(`El campo «${campo}» debe ser uno de: ${permitidas.join(", ")}`);
+  }
+  return valor;
+}
+
+export function booleano(valor, campo) {
+  if (typeof valor !== "boolean") throw new ErrorValidacion(`El campo «${campo}» debe ser verdadero o falso`);
+  return valor;
+}
+
+// Lista de valores tomados de un catálogo cerrado (sin repetidos).
+export function listaDe(valor, permitidas, campo, { min = 1 } = {}) {
+  if (!Array.isArray(valor)) throw new ErrorValidacion(`El campo «${campo}» debe ser una lista`);
+  const unicos = [...new Set(valor)];
+  if (unicos.length < min) throw new ErrorValidacion(`Elige al menos ${min} en «${campo}»`);
+  const invalido = unicos.find((x) => !permitidas.includes(x));
+  if (invalido !== undefined) throw new ErrorValidacion(`Valor no válido en «${campo}»: ${String(invalido).slice(0, 40)}`);
+  return unicos;
+}
+
+// Archivo recibido como data URL (data:<tipo>;base64,<contenido>).
+export function dataURL(valor, campo, { patron, max }) {
+  if (typeof valor !== "string" || valor.length > max || !patron.test(valor)) {
+    throw new ErrorValidacion(`El campo «${campo}» no es un archivo válido`);
+  }
+  return valor;
+}

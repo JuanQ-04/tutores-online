@@ -1,9 +1,10 @@
 // js/auth.js — Autenticación de TutoresOn-Line
 // Registro, login con correo, login con Google, cierre de sesión,
 // protección de páginas, errores en español y ciclo de vida de roles.
-// Trabaja junto a js/firebase-config.js (SDK v9 modular por CDN, sin npm).
+// Firebase Authentication maneja las credenciales; el perfil (rol, estado…) vive en la base
+// de datos y se pide/guarda SIEMPRE a través de la API (js/api.js), nunca directo.
 
-import { auth, db } from "./firebase-config.js";
+import { auth } from "./firebase-config.js";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -16,18 +17,16 @@ import {
   browserLocalPersistence,
   browserSessionPersistence
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import {
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  serverTimestamp
-} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { api, ErrorApi } from "./api.js";
 
 /* ---------------------------------------------------------
    Mensajes de error legibles en español
    --------------------------------------------------------- */
-function mensajeDeError(codigo) {
+function mensajeDeError(error) {
+  // Errores de la API: el servidor ya manda el mensaje en español.
+  if (error instanceof ErrorApi) return error.message;
+
+  const codigo = error?.code;
   const mensajes = {
     "auth/email-already-in-use": "Ya existe una cuenta con este correo. Intenta iniciar sesión.",
     "auth/invalid-credential": "Correo o contraseña incorrectos.",
@@ -94,19 +93,16 @@ window.registrarNuevoUsuario = async function (rol) {
 
   try {
     const credencial = await createUserWithEmailAndPassword(auth, email, password);
-    const uid = credencial.user.uid;
 
-    await setDoc(doc(db, "usuarios", uid), {
-      nombre: nombre,
-      apellido: apellido,
-      email: email,
-      rol: rol,
-      activo: true,
-      // Ciclo de vida del tutor: incompleto → pendiente → aprobado/rechazado.
-      // El estudiante nace "activo".
-      estado: rol === "tutor" ? "incompleto" : "activo",
-      creadoEn: serverTimestamp()
-    });
+    // La API crea el perfil (el tutor nace «incompleto» y el estudiante «activo»; el
+    // correo sale del token). Si falla, se borra la cuenta recién creada para que la
+    // persona pueda volver a intentarlo con el mismo correo en vez de quedar a medias.
+    try {
+      await api.registrarPerfil({ nombre, apellido, rol });
+    } catch (errorPerfil) {
+      await credencial.user.delete().catch(() => {});
+      throw errorPerfil;
+    }
 
     // Verificación de correo: se envía el enlace y se pasa a la pantalla de
     // espera. Si el envío falla, igual llegamos ahí: allí se puede reenviar.
@@ -117,7 +113,7 @@ window.registrarNuevoUsuario = async function (rol) {
     }
     window.location.href = "verificar.html";
   } catch (error) {
-    mostrarError(mensajeDeError(error.code));
+    mostrarError(mensajeDeError(error));
   }
 };
 
@@ -131,38 +127,18 @@ window.completarPerfilTutor = async function (datos, hojaVida) {
     return;
   }
 
-  const uid = auth.currentUser.uid;
-
   try {
-    // 1) El PDF va en su propia colección (hojasDeVida/{uid}) para que no
-    //    quede expuesto en el perfil público del tutor ni pese en cada lectura.
-    //    Se guarda ANTES de pasar a «pendiente»: las reglas solo dejan
-    //    escribirlo mientras el estado sigue en «incompleto».
-    if (hojaVida?.dataURL) {
-      await setDoc(doc(db, "hojasDeVida", uid), {
-        tutorId: uid,
-        nombreArchivo: hojaVida.nombreArchivo,
-        tamano: hojaVida.tamano,
-        dataURL: hojaVida.dataURL,
-        subidaEn: serverTimestamp()
-      });
-    }
-
-    // 2) Perfil profesional + paso a «pendiente»: así le aparece al admin.
-    await updateDoc(doc(db, "usuarios", uid), {
-      ...datos,
-      tieneHojaVida: Boolean(hojaVida?.dataURL),
-      estado: "pendiente",
-      solicitudEnviadaEn: serverTimestamp()
-    });
+    // La API guarda el PDF aparte del perfil público y pasa el estado a «pendiente»
+    // (así le aparece al administrador).
+    await api.enviarSolicitudTutor({ ...datos, hojaVida });
 
     // Llevar a la pantalla de solicitud pendiente.
     window.location.href = "registro-tutor.html?resultado=pendiente";
   } catch (error) {
     console.error("No se pudo enviar la solicitud:", error);
     mostrarError(
-      error?.code === "permission-denied"
-        ? "Firestore rechazó el envío (permission-denied). Revisa que publicaste las reglas actualizadas."
+      error instanceof ErrorApi
+        ? error.message
         : "No se pudo enviar la solicitud. Revisa tu conexión e inténtalo de nuevo."
     );
   }
@@ -196,21 +172,24 @@ async function redirigirAlPanel() {
   let rol = "estudiante";
   let estado = "";
   try {
-    const refPerfil = doc(db, "usuarios", auth.currentUser.uid);
-    const snap = await getDoc(refPerfil);
-    if (snap.exists()) {
-      // Cuenta suspendida por el administrador (activo = false): no entra.
-      if (snap.data().activo === false) {
-        await signOut(auth);
-        sesionRecienIniciada = false;
-        mostrarError("Tu cuenta está suspendida. Contacta al equipo de TutoresOn-Line.");
-        return;
-      }
-      rol = snap.data().rol || "estudiante";
-      estado = snap.data().estado || "";
+    const perfil = await api.miPerfil();
+    // Cuenta suspendida por el administrador (activo = false): no entra.
+    if (perfil.activo === false) {
+      await signOut(auth);
+      sesionRecienIniciada = false;
+      mostrarError("Tu cuenta está suspendida. Contacta al equipo de TutoresOn-Line.");
+      return;
     }
+    rol = perfil.rol || "estudiante";
+    estado = perfil.estado || "";
   } catch (error) {
-    console.warn("No se pudo leer el perfil:", error);
+    // 404 = todavía no tiene perfil: se trata como estudiante. Cualquier otro error
+    // (servidor dormido o sin conexión) NO debe mandar a un tutor al panel equivocado.
+    if (error.status !== 404) {
+      sesionRecienIniciada = false;
+      mostrarError("No pudimos cargar tu perfil. Si el servidor estaba dormido, espera unos segundos e inténtalo de nuevo.");
+      return;
+    }
   }
   window.location.href = destinoSegunRol(rol, estado);
 }
@@ -235,7 +214,7 @@ if (loginForm) {
       redirigirAlPanel();
     } catch (error) {
       sesionRecienIniciada = false;
-      mostrarError(mensajeDeError(error.code));
+      mostrarError(mensajeDeError(error));
     }
   });
 }
@@ -256,28 +235,21 @@ if (btnGoogle) {
       const resultado = await signInWithPopup(auth, provider);
       const usuario = resultado.user;
 
-      // Primera vez con Google → crear su perfil como estudiante.
-      const refPerfil = doc(db, "usuarios", usuario.uid);
-      const existe = await getDoc(refPerfil);
-      if (!existe.exists()) {
-        const partes = (usuario.displayName || "Estudiante").split(" ");
-        await setDoc(refPerfil, {
-          nombre: partes[0],
-          apellido: partes.slice(1).join(" ") || "TutoresOn",
-          email: usuario.email,
-          rol: "estudiante",
-          activo: true,
-          estado: "activo",
-          creadoEn: serverTimestamp()
-        });
-      }
+      // Primera vez con Google → la API crea su perfil como estudiante. Si ya tenía perfil
+      // (de cualquier rol) lo devuelve intacto, así que se puede llamar en cada ingreso.
+      const partes = (usuario.displayName || "Estudiante").split(" ");
+      await api.registrarPerfil({
+        nombre: partes[0],
+        apellido: partes.slice(1).join(" ") || "TutoresOn",
+        rol: "estudiante"
+      });
 
       redirigirAlPanel();
     } catch (error) {
       // Si falla o cierras el popup, volver a permitir el aviso de sesión activa.
       sesionRecienIniciada = false;
       console.error("Error al iniciar sesión con Google:", error);
-      mostrarError(mensajeDeError(error.code));
+      mostrarError(mensajeDeError(error));
     }
   });
 }
@@ -328,12 +300,9 @@ onAuthStateChanged(auth, async (usuario) => {
       let rol = "estudiante";
       let estado = "";
       try {
-        const refPerfil = doc(db, "usuarios", usuario.uid);
-        const snap = await getDoc(refPerfil);
-        if (snap.exists()) {
-          rol = snap.data().rol || "estudiante";
-          estado = snap.data().estado || "";
-        }
+        const perfil = await api.miPerfil();
+        rol = perfil.rol || "estudiante";
+        estado = perfil.estado || "";
       } catch (error) {
         console.warn("No se pudo leer el perfil:", error);
       }
@@ -351,8 +320,8 @@ onAuthStateChanged(auth, async (usuario) => {
         return;
       }
       try {
-        const snap = await getDoc(doc(db, "usuarios", usuario.uid));
-        if (snap.exists() && snap.data().activo === false) {
+        const perfil = await api.miPerfil();
+        if (perfil.activo === false) {
           await signOut(auth);
           window.location.href = "login.html";
         }
@@ -389,4 +358,4 @@ export async function enviarVerificacion(usuario) {
 
 export { destinoSegunRol };
 
-console.log("✅ Firebase conectado y autenticación lista");
+console.log("✅ Autenticación lista");

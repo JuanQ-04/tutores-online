@@ -1,10 +1,10 @@
 // js/verificar.js — Pantalla de verificación de correo (Firebase Authentication)
 // Muestra el correo, permite reenviar el enlace y entra al panel en cuanto
-// el correo queda verificado. No usa Firestore salvo para leer el rol propio.
+// el correo queda verificado. Solo pide a la API el rol propio para saber a qué panel ir.
 
-import { auth, db } from "./firebase-config.js";
+import { auth } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { api } from "./api.js";
 import { enviarVerificacion, destinoSegunRol } from "./auth.js";
 
 const elCorreo   = document.getElementById("verificar-correo");
@@ -40,19 +40,17 @@ async function comprobar(manual = false) {
   }
 
   entrando = true;
-  // Renueva el token para que Firestore vea «email_verified = true».
+  // Renueva el token para que la API vea «email_verified = true».
   await usuario.getIdToken(true);
 
   let rol = "estudiante";
   let estado = "";
   try {
-    const snap = await getDoc(doc(db, "usuarios", usuario.uid));
-    if (snap.exists()) {
-      rol = snap.data().rol || "estudiante";
-      estado = snap.data().estado || "";
-    }
+    const perfil = await api.miPerfil();
+    rol = perfil.rol || "estudiante";
+    estado = perfil.estado || "";
   } catch (e) {
-    console.warn("No se pudo leer el perfil:", e.code);
+    console.warn("No se pudo leer el perfil:", e.message);
   }
   window.location.href = destinoSegunRol(rol, estado);
 }

@@ -1,0 +1,84 @@
+# Blueprint de Render: https://render.com/docs/infrastructure-as-code
+# Crea dos servicios: el sitio estático (frontend) y la API (backend).
+# Dashboard → New → Blueprint → elige este repositorio.
+services:
+
+  # ── Frontend: sitio estático ────────────────────────────────────────────
+  - type: web
+    name: tutores-online
+    runtime: static
+    # Solo se publica lo público: así backend/ (código, .env, claves) nunca queda en la web.
+    buildCommand: mkdir -p dist && cp -r index.html pages css js images dist/
+    staticPublishPath: ./dist
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        # connect-src: la API en Render y los servicios de Firebase Authentication.
+        # script-src apis.google.com y frame-src firebaseapp.com/accounts.google.com: ventana
+        # emergente de «Continuar con Google». Si cambias el nombre de la API, cámbialo aquí
+        # y en API_URL (js/api.js).
+        value: >-
+          default-src 'self';
+          script-src 'self' https://www.gstatic.com https://apis.google.com;
+          style-src 'self' 'unsafe-inline';
+          img-src 'self' data: blob:;
+          font-src 'self';
+          connect-src 'self' https://tutores-online-api.onrender.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com;
+          frame-src https://tutores-online.firebaseapp.com https://accounts.google.com;
+          object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        # Con «strict-origin-when-cross-origin» el popup de Google no recibe la ruta completa.
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()
+
+  # ── Backend: API REST (Node + Express + Firebase Admin) ────────────────
+  - type: web
+    name: tutores-online-api      # la URL resultante debe coincidir con API_URL en js/api.js
+    runtime: node
+    plan: free                    # se duerme tras ~15 min sin uso; la primera petición tarda ~1 min
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: ZONA_HORARIA
+        value: America/Bogota
+      # URL del sitio estático (sin barra final). Si Render le asigna otro nombre, cámbiala.
+      - key: CORS_ORIGINS
+        value: https://tutores-online.onrender.com
+      # Credenciales de Firebase Admin: copia los tres valores del JSON de la cuenta de servicio
+      # (Firebase Console → Configuración → Cuentas de servicio → Generar nueva clave privada).
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false               # pégala tal cual viene en el JSON, con los \n
+      # Correo (opcional). Sin SMTP_HOST los correos se imprimen en el log.
+      # El plan gratuito de Render bloquea los puertos SMTP 25, 465 y 587.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false

@@ -40,11 +40,12 @@ function quitarHorarioCompletado(disponibilidad, tutoria) {
 }
 
 export class TutoriaService {
-  constructor({ usuarioRepo, tutoriaRepo, reservaRepo, notificaciones }) {
+  constructor({ usuarioRepo, tutoriaRepo, reservaRepo, notificaciones, avisos }) {
     this.usuarioRepo = usuarioRepo;
     this.tutoriaRepo = tutoriaRepo;
     this.reservaRepo = reservaRepo;
     this.notificaciones = notificaciones;
+    this.avisos = avisos;
   }
 
   async listarMias(usuario) {
@@ -64,7 +65,7 @@ export class TutoriaService {
   // Solo el tutor marca la tutoría como realizada (habilita la calificación del estudiante).
   async completar(usuario, id) {
     if (!esTutorAprobado(usuario)) throw new Prohibido("Solo un tutor aprobado puede completar tutorías");
-    await this.#cambiarEstado(
+    const tutoria = await this.#cambiarEstado(
       id,
       "completada",
       (t) => {
@@ -78,6 +79,12 @@ export class TutoriaService {
         });
       }
     );
+    await this.avisos.avisar(tutoria.estudianteId, {
+      tipo: "tutoria-completada",
+      titulo: "Tutoría completada",
+      detalle: `${tutoria.tutorNombre} marcó como realizada tu tutoría de ${tutoria.materia}. Ya puedes calificarla.`,
+      destino: { seccion: "tutorias", id }
+    });
     return { id, estado: "completada" };
   }
 
@@ -94,6 +101,12 @@ export class TutoriaService {
       destinatario,
       tutoria,
       canceladaPor: nombreCompleto(usuario) || "Un participante"
+    });
+    await this.avisos.avisar(otroId, {
+      tipo: "tutoria-cancelada",
+      titulo: "Tutoría cancelada",
+      detalle: `${nombreCompleto(usuario) || "Un participante"} canceló la tutoría de ${tutoria.materia} del ${tutoria.fecha}, de ${tutoria.horaInicio} a ${tutoria.horaFin}.`,
+      destino: { seccion: "tutorias", id }
     });
     return { id, estado: "cancelada" };
   }

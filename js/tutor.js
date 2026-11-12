@@ -1,19 +1,10 @@
 // js/tutor.js — Panel del tutor
-// Perfil, Solicitudes, Tutorías, Disponibilidad y Calificaciones conectados a
-// Firestore. Seguridad y Centro de ayuda: js/configuracion.js.
+// Perfil, Solicitudes, Tutorías, Disponibilidad y Calificaciones: todo viaja por la API
+// (js/api.js); este panel nunca habla directo con la base de datos.
+// Seguridad y Centro de ayuda: js/configuracion.js.
 // Las notificaciones se arman con las solicitudes y tutorías del tutor.
 
-import { auth, db } from "./firebase-config.js";
-import {
-  doc,
-  getDoc,
-  updateDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-  onSnapshot
-} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { auth } from "./firebase-config.js";
 import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
@@ -22,7 +13,9 @@ import {
   activarSelectorFoto,
   guardarFotoPerfil
 } from "./foto-perfil.js";
-import { api } from "./api.js";
+import { api, aMillis, sondear, sonIguales } from "./api.js";
+import { cargarMaterias, materiasActuales, nombreMateria } from "./materias.js";
+import { crearBandeja, htmlAviso, activarClics } from "./notificaciones.js";
 
 (() => {
   "use strict";
@@ -34,30 +27,23 @@ import { api } from "./api.js";
   // Estado global de la aplicación
   // ----------------------------------------------------------------
 
-  let solicitudesData = []; // documentos crudos de la colección "solicitudes"
-  let tutoriasData = [];    // documentos crudos de la colección "tutorias"
-  let blocks = [];          // disponibilidad, sincronizada con Firestore
-  let tutorUid = null;      // uid del tutor autenticado
+  let solicitudesData = []; // solicitudes que recibió el tutor (GET /solicitudes/mias)
+  let tutoriasData = [];    // sus tutorías (GET /tutorias/mias)
+  let blocks = [];          // disponibilidad, tal como la guarda el servidor
   let calificacionesData = []; // calificaciones que recibió este tutor
-  let cancelarEscuchas = []; // listeners Firestore del tutor actual
+  let detenerSondeo = null; // cancela la actualización periódica del panel
 
-  const notifications = [
-    {
-      title: "Bienvenido al panel",
-      message: "Carga lista. Solicitudes y tutorías se leen desde tu cuenta."
-    }
-  ];
-
-  // Perfil real (Firestore). Comienza vacío; se llena al cargar la página.
+  // Perfil real (API). Comienza vacío; se llena al cargar la página.
+  // Nombre, apellido y foto se guardan directo; los datos profesionales (materias, modalidad,
+  // tarifa, ciudad…) viven en `datos` y solo cambian cuando un administrador aprueba una solicitud.
   let profile = {
     name: "",
     lastname: "",
     email: "",
-    city: "",
-    rate: "",
-    presentation: "",
-    photo: ""
+    photo: "",
+    datos: {}
   };
+  let solicitudCambio = null; // última solicitud de actualización (GET /usuarios/yo/solicitud-cambio)
 
   const titles = {
     inicio: "Inicio",
@@ -151,20 +137,15 @@ import { api } from "./api.js";
   }
 
   // ----------------------------------------------------------------
-  // Normalización: Firestore → formato interno de render
+  // Normalización: datos de la API → formato interno de render
   // ----------------------------------------------------------------
 
-  // Convierte el campo "fecha" de Firestore (puede ser Timestamp, Date o string ISO)
-  // a una cadena "YYYY-MM-DD" que usan las funciones de render.
+  // La API entrega "fecha" como "YYYY-MM-DD"; si faltara, se usa hoy.
   function tsToISO(fecha) {
-    if (!fecha) return dateISO(new Date());
-    if (typeof fecha.toDate === "function") return dateISO(fecha.toDate());
-    if (fecha instanceof Date) return dateISO(fecha);
-    if (typeof fecha === "string") return fecha.slice(0, 10);
-    return dateISO(new Date());
+    return typeof fecha === "string" && fecha ? fecha.slice(0, 10) : dateISO(new Date());
   }
 
-  // Mapea estados Firestore → clases CSS que ya existen en el panel.
+  // Mapea estados de la API → clases CSS que ya existen en el panel.
   const estadoSolicitud = {
     pendiente: "pending",
     aceptada: "confirmed",
@@ -337,25 +318,55 @@ import { api } from "./api.js";
     window.location.hash = previousSection === "notificaciones" ? "inicio" : previousSection;
   });
 
+  // Las notificaciones se guardan en la base de datos (siguen ahí al recargar o iniciar sesión otra vez).
+  // Al hacer clic en una se marca como leída y se abre lo que anuncia.
+  const bandeja = crearBandeja({ alCambiar: () => renderNotifications() });
+
   function renderNotifications() {
-    function notificationHTML(item) {
-      return `<li><h3>${escapeHTML(item.title)}</h3><p>${escapeHTML(item.message)}</p></li>`;
-    }
-    $("#tutor-notification-preview").innerHTML = notifications.slice(0, 3).map(notificationHTML).join("");
-    $("#tutor-notification-full").innerHTML = notifications.map(notificationHTML).join("");
+    const { avisos, sinLeer, cargado, fallo } = bandeja.estado;
+    const mensaje = (texto) => `<li><p class="aviso-vacio">${texto}</p></li>`;
+    const vacio = !cargado
+      ? mensaje(fallo ? "No se pudieron cargar tus notificaciones." : "Cargando tus notificaciones…")
+      : mensaje("Todavía no tienes notificaciones.");
+
+    $("#tutor-notification-preview").innerHTML = avisos.length
+      ? avisos.slice(0, 4).map((a) => `<li>${htmlAviso(a, { compacto: true })}</li>`).join("")
+      : vacio;
+    $("#tutor-notification-full").innerHTML = avisos.length
+      ? avisos.map((a) => `<li>${htmlAviso(a, { etiquetaTitulo: "h2" })}</li>`).join("")
+      : vacio;
+
     const count = $("#tutor-notification-count");
-    count.textContent = notifications.length;
-    count.hidden = notifications.length === 0;
+    count.textContent = sinLeer > 9 ? "9+" : String(sinLeer);
+    count.hidden = sinLeer === 0;
     notificationToggle.setAttribute(
       "aria-label",
-      `Notificaciones, ${notifications.length} novedades`
+      sinLeer ? `Notificaciones, ${sinLeer} sin leer` : "Notificaciones"
     );
+    $("#tutor-notifications-read-all").disabled = sinLeer === 0;
   }
 
-  function addNotification(title, message) {
-    notifications.unshift({ title, message });
-    renderNotifications();
+  // A dónde lleva cada notificación (el servidor indica la sección y, si aplica, el elemento).
+  function abrirAviso(aviso) {
+    bandeja.leer(aviso.id);
+    setNotificationMenu(false);
+    const { seccion, id } = aviso.destino || {};
+
+    if (seccion === "solicitudes") {
+      $("#tutor-request-status").value = "all";
+      $("#tutor-request-search").value = "";
+      renderRequests();
+    }
+    window.location.hash = Object.hasOwn(titles, seccion) ? seccion : "inicio";
+    if ((seccion === "solicitudes" || seccion === "tutorias") && id) {
+      if (solicitudesData.some((s) => s.id === id) || tutoriasData.some((t) => t.id === id)) openDetail(id);
+      else showToast("Esa solicitud o tutoría ya no está disponible.");
+    }
   }
+
+  activarClics($("#tutor-notification-preview"), bandeja, abrirAviso);
+  activarClics($("#tutor-notification-full"), bandeja, abrirAviso);
+  $("#tutor-notifications-read-all").addEventListener("click", () => bandeja.leerTodas());
 
   // ----------------------------------------------------------------
   // HTML de tarjetas de sesión/tutoría
@@ -664,9 +675,7 @@ import { api } from "./api.js";
       ? `★ ${promedio.toFixed(1)} · ${total} ${total === 1 ? "opinión" : "opiniones"}`
       : "Sin calificaciones";
 
-    const ordenadas = [...calificacionesData].sort(
-      (a, b) => (b.creadaEn?.toMillis?.() ?? 0) - (a.creadaEn?.toMillis?.() ?? 0)
-    );
+    const ordenadas = [...calificacionesData].sort((a, b) => aMillis(b.creadaEn) - aMillis(a.creadaEn));
 
     $("#tutor-reviews-list").innerHTML = ordenadas.length
       ? ordenadas.map((c) => `
@@ -688,7 +697,7 @@ import { api } from "./api.js";
   // ----------------------------------------------------------------
 
   // Los blocks usan { id, fecha, horaInicio, horaFin, modalidad }
-  // (mismo esquema que se guarda en Firestore)
+  // (mismo esquema que guarda el servidor)
 
   function renderCalendar() {
     const dates = dayNames.map((_, i) => dateISO(addDays(weekStart, i)));
@@ -822,8 +831,30 @@ import { api } from "./api.js";
   fillHourSelects();
   $("#tutor-block-start").addEventListener("change", updateEndOptions);
 
+  // Solo se ofrece la modalidad que el tutor eligió en su perfil: «Virtual» → Virtual,
+  // «Presencial» → Presencial, «Virtual y presencial» → las tres. (La API también lo exige.)
+  function modalidadesPermitidas() {
+    const m = profile.datos.modalidad;
+    return m === "Virtual" || m === "Presencial" ? [m] : ["Virtual", "Presencial", "Virtual y presencial"];
+  }
+
+  function pintarModalidadesBloque() {
+    const select = $("#tutor-block-mode");
+    const permitidas = modalidadesPermitidas();
+    select.innerHTML = permitidas.map((m) => `<option>${escapeHTML(m)}</option>`).join("");
+    select.disabled = permitidas.length === 1;
+
+    const aviso = $("#tutor-block-mode-hint");
+    aviso.hidden = permitidas.length !== 1;
+    aviso.textContent = permitidas.length === 1
+      ? `Tu perfil es «${permitidas[0]}», así que solo puedes ofrecer bloques ${permitidas[0] === "Virtual" ? "virtuales" : "presenciales"}. `
+        + "Para cambiarlo, envía una actualización de tus datos en «Mi perfil»."
+      : "";
+  }
+
   $("#tutor-add-block").addEventListener("click", () => {
     $("#tutor-block-form").reset();
+    pintarModalidadesBloque();
     updateEndOptions();
     $("#tutor-block-date").value = dateISO(weekStart);
     $("#tutor-block-error").textContent = "";
@@ -834,7 +865,6 @@ import { api } from "./api.js";
     event.preventDefault();
 
     const newBlock = {
-      id: `block-${Date.now()}`,
       fecha: $("#tutor-block-date").value,
       horaInicio: $("#tutor-block-start").value,
       horaFin: $("#tutor-block-end").value,
@@ -870,25 +900,36 @@ import { api } from "./api.js";
       return;
     }
 
-    blocks.push(newBlock);
-    weekStart = mondayOf(parseDate(newBlock.fecha));
-    $("#tutor-block-dialog").close();
-
-    await guardarDisponibilidad();
-    renderAll();
-    showToast("Bloque guardado.");
+    // El servidor vuelve a validar el horario (choques, pasado, rango permitido) y
+    // devuelve la disponibilidad completa ya actualizada.
+    try {
+      const respuesta = await api.agregarBloque(newBlock);
+      blocks = respuesta.disponibilidad;
+      weekStart = mondayOf(parseDate(newBlock.fecha));
+      $("#tutor-block-dialog").close();
+      renderAll();
+      showToast("Bloque guardado.");
+    } catch (err) {
+      console.error("Error al guardar disponibilidad:", err);
+      error.textContent = err?.message || "No se pudo guardar el bloque. Revisa tu conexión.";
+    }
   });
 
   async function deleteBlock(id) {
     if (!window.confirm("¿Eliminar este bloque de disponibilidad?")) return;
-    blocks = blocks.filter((b) => b.id !== id);
-    await guardarDisponibilidad();
-    renderAll();
-    showToast("Bloque eliminado.");
+    try {
+      const respuesta = await api.quitarBloque(id);
+      blocks = respuesta.disponibilidad;
+      renderAll();
+      showToast("Bloque eliminado.");
+    } catch (err) {
+      console.error("Error al eliminar el bloque:", err);
+      showToast(err?.message || "No se pudo eliminar el bloque. Revisa tu conexión.");
+    }
   }
 
   // ----------------------------------------------------------------
-  // Perfil real (Firestore)
+  // Perfil real (API)
   // ----------------------------------------------------------------
 
   function aplicarPerfilTutor() {
@@ -898,9 +939,6 @@ import { api } from "./api.js";
     $("#tutor-name").value = profile.name;
     $("#tutor-lastname").value = profile.lastname;
     $("#tutor-email").value = profile.email;
-    $("#tutor-city").value = profile.city;
-    $("#tutor-rate").value = profile.rate;
-    $("#tutor-presentation").value = profile.presentation;
 
     $("#tutor-profile-name").textContent = fullName || "Tutor";
     pintarAvatar($("#tutor-profile-avatar"), profile.photo, avatarText);
@@ -914,9 +952,7 @@ import { api } from "./api.js";
   const profileForm = $("#tutor-profile-form");
   const profileTextFields = [
     $("#tutor-name"),
-    $("#tutor-lastname"),
-    $("#tutor-city"),
-    $("#tutor-presentation")
+    $("#tutor-lastname")
   ];
 
   profileTextFields.forEach((field) => {
@@ -937,32 +973,24 @@ import { api } from "./api.js";
 
     if (!profileForm.reportValidity()) return;
 
-    const tarifa = Number($("#tutor-rate").value) || 0;
     const nota = $("#tutor-profile-note");
-    const usuario = auth.currentUser;
 
-    if (!usuario) {
+    if (!auth.currentUser) {
       if (nota) nota.textContent = "Tu sesión expiró. Vuelve a iniciar sesión.";
       return;
     }
 
     try {
-      await updateDoc(doc(db, "usuarios", usuario.uid), {
+      // Solo nombre y apellido: los datos profesionales pasan por la solicitud de actualización.
+      await api.actualizarPerfil({
         nombre: $("#tutor-name").value,
-        apellido: $("#tutor-lastname").value,
-        ciudad: $("#tutor-city").value,
-        tarifa,
-        presentacion: $("#tutor-presentation").value
+        apellido: $("#tutor-lastname").value
       });
 
       profile = {
+        ...profile,
         name: $("#tutor-name").value,
-        lastname: $("#tutor-lastname").value,
-        email: profile.email,
-        city: $("#tutor-city").value,
-        rate: String(tarifa),
-        presentation: $("#tutor-presentation").value,
-        photo: profile.photo
+        lastname: $("#tutor-lastname").value
       };
 
       aplicarPerfilTutor();
@@ -972,8 +1000,246 @@ import { api } from "./api.js";
       showToast("Perfil actualizado.");
     } catch (error) {
       console.error("Error al guardar perfil:", error);
-      if (nota) nota.textContent = "No se pudo guardar el perfil. Revisa tu conexión.";
-      showToast("No se pudo guardar el perfil.");
+      const motivo = error?.message || "No se pudo guardar el perfil. Revisa tu conexión.";
+      if (nota) nota.textContent = motivo;
+      showToast(motivo);
+    }
+  });
+
+  // ----------------------------------------------------------------
+  // Datos profesionales: se piden como solicitud y los aprueba un administrador
+  // ----------------------------------------------------------------
+
+  const ETIQUETAS_CAMBIO = {
+    titulo: "Carrera o formación", nivelEstudios: "Nivel de estudios", institucion: "Institución",
+    materias: "Materias", nivelEnsenanza: "Nivel al que enseñas", experiencia: "Experiencia",
+    modalidad: "Modalidad", ciudad: "Ciudad", tarifa: "Tarifa por hora", franjas: "Franjas",
+    presentacion: "Presentación", hojaVidaPDF: "Hoja de vida"
+  };
+  const NIVELES_ESTUDIO = {
+    tecnico: "Técnico o tecnólogo", "pregrado-curso": "Pregrado en curso", pregrado: "Pregrado finalizado", posgrado: "Posgrado"
+  };
+  const NIVELES_ENSENANZA = { secundaria: "Secundaria", universitario: "Universitario", ambos: "Secundaria y universitario" };
+  const NOMBRES_FRANJA = { manana: "Mañana", tarde: "Tarde", noche: "Noche" };
+  const MAX_PDF_BYTES = 700 * 1024; // el PDF se guarda en la base de datos (máx. 1 MiB por documento)
+
+  const proForm = $("#tutor-professional-form");
+  const proError = $("#tutor-professional-error");
+
+  const textoValor = (campo, valor) => {
+    if (valor === undefined || valor === null || valor === "" || (Array.isArray(valor) && !valor.length)) return "—";
+    switch (campo) {
+      case "materias": return valor.map(nombreMateria).join(", ");
+      case "franjas": return valor.map((f) => NOMBRES_FRANJA[f] || f).join(", ");
+      case "nivelEstudios": return NIVELES_ESTUDIO[valor] || valor;
+      case "nivelEnsenanza": return NIVELES_ENSENANZA[valor] || valor;
+      case "experiencia": return `${valor} ${Number(valor) === 1 ? "año" : "años"}`;
+      case "tarifa": return `$${Number(valor).toLocaleString("es-CO")} COP`;
+      case "presentacion": return String(valor).length > 80 ? `${String(valor).slice(0, 80)}…` : String(valor);
+      default: return String(valor);
+    }
+  };
+
+  const fechaCorta = (iso) => {
+    const f = new Date(iso);
+    return Number.isNaN(f.getTime())
+      ? ""
+      : f.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
+  };
+
+  // Una casilla por materia del catálogo (las de base y las que agregó el administrador).
+  // Se conserva lo que la persona ya marcó; si todavía no hay casillas, se marcan las del perfil.
+  function pintarMateriasPerfil() {
+    const grid = $("#tutor-subjects-grid");
+    const existentes = [...grid.querySelectorAll("input")];
+    const marcadas = new Set(
+      existentes.length ? existentes.filter((i) => i.checked).map((i) => i.value) : (profile.datos.materias || [])
+    );
+    const catalogo = materiasActuales();
+    const extras = (profile.datos.materias || [])
+      .filter((id) => !catalogo.some((m) => m.id === id))
+      .map((id) => ({ id, nombre: nombreMateria(id) }));
+
+    grid.replaceChildren(...[...catalogo, ...extras].map((materia) => {
+      const etiqueta = document.createElement("label");
+      etiqueta.className = "tutor-check-option";
+      const casilla = document.createElement("input");
+      casilla.type = "checkbox";
+      casilla.value = materia.id;
+      casilla.checked = marcadas.has(materia.id);
+      const texto = document.createElement("span");
+      texto.textContent = materia.nombre;
+      etiqueta.append(casilla, texto);
+      return etiqueta;
+    }));
+  }
+
+  // Carga en el formulario los datos vigentes (los aprobados).
+  function llenarFormularioProfesional() {
+    const d = profile.datos;
+    $("#tutor-degree").value = d.titulo || "";
+    $("#tutor-study-level").value = d.nivelEstudios || "";
+    $("#tutor-institution").value = d.institucion || "";
+    $("#tutor-teach-level").value = d.nivelEnsenanza || "";
+    $("#tutor-experience").value = Number.isInteger(d.experiencia) ? String(d.experiencia) : "";
+    $("#tutor-modality").value = d.modalidad || "";
+    $("#tutor-city").value = d.ciudad || "";
+    $("#tutor-rate").value = d.tarifa != null ? String(d.tarifa) : "";
+    $("#tutor-presentation").value = d.presentacion || "";
+    $("#tutor-cv").value = "";
+    $$('input[name="tutor-franja"]').forEach((i) => { i.checked = (d.franjas || []).includes(i.value); });
+    $("#tutor-subjects-grid").replaceChildren(); // se vuelven a marcar según el perfil
+    pintarMateriasPerfil();
+    proError.textContent = "";
+    renderEstadoSolicitud();
+  }
+
+  function leerFormularioProfesional() {
+    return {
+      titulo: $("#tutor-degree").value.trim(),
+      nivelEstudios: $("#tutor-study-level").value,
+      institucion: $("#tutor-institution").value.trim(),
+      materias: $$("#tutor-subjects-grid input:checked").map((i) => i.value),
+      nivelEnsenanza: $("#tutor-teach-level").value,
+      experiencia: Number($("#tutor-experience").value),
+      modalidad: $("#tutor-modality").value,
+      ciudad: $("#tutor-city").value.trim(),
+      tarifa: Number($("#tutor-rate").value),
+      franjas: $$('input[name="tutor-franja"]:checked').map((i) => i.value),
+      presentacion: $("#tutor-presentation").value.trim()
+    };
+  }
+
+  // Igual que en el servidor: las listas son conjuntos (el orden no cuenta).
+  const clave = (v) => JSON.stringify(Array.isArray(v) ? [...v].sort() : (v ?? null));
+  const hayCambios = (nuevos) => Object.keys(nuevos).some((c) => clave(profile.datos[c]) !== clave(nuevos[c]));
+
+  function leerPdf(archivo) {
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onload = () => resolve(lector.result);
+      lector.onerror = () => reject(lector.error);
+      lector.readAsDataURL(archivo);
+    });
+  }
+
+  async function cargarSolicitudCambio() {
+    try {
+      const { solicitud } = await api.solicitudCambio();
+      const cambio = !sonIguales(solicitud, solicitudCambio);
+      solicitudCambio = solicitud;
+      if (cambio) renderEstadoSolicitud();
+      return cambio;
+    } catch (err) {
+      console.warn("No se pudo cargar tu solicitud de actualización:", err);
+      return false;
+    }
+  }
+
+  function renderEstadoSolicitud() {
+    const caja = $("#tutor-change-status");
+    const cancelar = $("#tutor-change-cancel");
+    const s = solicitudCambio;
+    cancelar.hidden = !(s && s.estado === "pendiente");
+
+    const faltan = ["modalidad", "nivelEstudios", "nivelEnsenanza", "experiencia"]
+      .filter((c) => profile.datos[c] === undefined || profile.datos[c] === "");
+    const aviso = faltan.length && profile.email
+      ? "<p>Tu perfil se creó antes de que pidiéramos modalidad, niveles y experiencia. "
+        + "Complétalos y envía la solicitud para que se guarden (y para que los estudiantes puedan filtrarte por modalidad).</p>"
+      : "";
+
+    if (!s) {
+      caja.hidden = !aviso;
+      caja.className = "tutor-change-status";
+      caja.innerHTML = aviso;
+      return;
+    }
+
+    const cambios = Object.entries(s.cambios || {}).map(([campo, nuevo]) =>
+      `<li><strong>${escapeHTML(ETIQUETAS_CAMBIO[campo] || campo)}:</strong> `
+      + (campo === "hojaVidaPDF"
+          ? escapeHTML(`archivo nuevo «${nuevo}»`)
+          : `${escapeHTML(textoValor(campo, profile.datos[campo]))} → ${escapeHTML(textoValor(campo, nuevo))}`)
+      + "</li>"
+    ).join("");
+
+    const cuando = fechaCorta(s.creadaEn);
+    const nota = s.nota ? `<p><strong>Mensaje del administrador:</strong> ${escapeHTML(s.nota)}</p>` : "";
+    caja.hidden = false;
+    if (s.estado === "pendiente") {
+      caja.className = "tutor-change-status is-pending";
+      caja.innerHTML = `<p><strong>Solicitud pendiente</strong>${cuando ? ` (enviada el ${escapeHTML(cuando)})` : ""}. `
+        + "Un administrador la revisará; hasta entonces se mantienen tus datos actuales. "
+        + `Si envías otra, reemplaza a esta.</p><ul>${cambios}</ul>${aviso}`;
+    } else if (s.estado === "aprobada") {
+      caja.className = "tutor-change-status is-approved";
+      caja.innerHTML = `<p><strong>Tu última actualización fue aprobada</strong> y ya está en tu perfil.</p>${nota}${aviso}`;
+    } else {
+      caja.className = "tutor-change-status is-rejected";
+      caja.innerHTML = `<p><strong>Tu última solicitud fue rechazada.</strong> Tu perfil sigue con los datos anteriores.</p>`
+        + `<ul>${cambios}</ul>${nota}${aviso}`;
+    }
+  }
+
+  proForm.addEventListener("input", () => { proError.textContent = ""; });
+
+  proForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    proError.textContent = "";
+
+    // Los textos deben tener letras (no solo números o símbolos).
+    ["#tutor-degree", "#tutor-institution", "#tutor-city", "#tutor-presentation"].forEach((sel) => {
+      const campo = $(sel);
+      campo.value = campo.value.trim();
+      campo.setCustomValidity(campo.value && !/\p{L}/u.test(campo.value) ? "Escribe un texto que contenga letras." : "");
+    });
+    if (!proForm.reportValidity()) return;
+
+    const datos = leerFormularioProfesional();
+    if (!datos.materias.length) { proError.textContent = "Selecciona al menos una materia."; return; }
+    if (!datos.franjas.length) { proError.textContent = "Selecciona al menos una franja de disponibilidad."; return; }
+
+    const archivo = $("#tutor-cv").files[0];
+    if (archivo) {
+      if (!/\.pdf$/i.test(archivo.name) || (archivo.type && archivo.type !== "application/pdf")) {
+        proError.textContent = "La hoja de vida debe ser un archivo PDF."; return;
+      }
+      if (archivo.size > MAX_PDF_BYTES) {
+        proError.textContent = "El PDF pesa más de 700 KB. Comprímelo e inténtalo de nuevo."; return;
+      }
+    }
+    if (!archivo && !hayCambios(datos)) { proError.textContent = "No cambiaste ningún dato."; return; }
+
+    const boton = $("#tutor-professional-submit");
+    boton.disabled = true;
+    try {
+      if (archivo) {
+        datos.hojaVida = { nombreArchivo: archivo.name, tamano: archivo.size, dataURL: await leerPdf(archivo) };
+      }
+      await api.solicitarCambio(datos);
+      $("#tutor-cv").value = "";
+      await cargarSolicitudCambio();
+      renderEstadoSolicitud();
+      showToast("Solicitud enviada. Un administrador la revisará.");
+    } catch (err) {
+      console.error("No se pudo enviar la solicitud de actualización:", err);
+      proError.textContent = err?.message || "No se pudo enviar la solicitud. Revisa tu conexión.";
+    } finally {
+      boton.disabled = false;
+    }
+  });
+
+  $("#tutor-change-cancel").addEventListener("click", async () => {
+    if (!window.confirm("¿Cancelar tu solicitud de actualización pendiente?")) return;
+    try {
+      await api.cancelarCambio();
+      solicitudCambio = null;
+      llenarFormularioProfesional();
+      showToast("Solicitud cancelada.");
+    } catch (err) {
+      console.error("No se pudo cancelar la solicitud:", err);
+      showToast(err?.message || "No se pudo cancelar la solicitud. Revisa tu conexión.");
     }
   });
 
@@ -996,113 +1262,130 @@ import { api } from "./api.js";
   );
 
   // ----------------------------------------------------------------
-  // Firestore: carga de datos
+  // API: carga de datos
   // ----------------------------------------------------------------
 
-  async function cargarPerfilTutor(uid) {
+  async function cargarPerfilTutor() {
     const nota = $("#tutor-profile-note");
     if (nota) nota.textContent = "Cargando tu perfil…";
     try {
-      const snap = await getDoc(doc(db, "usuarios", uid));
-      const datos = snap.exists() ? snap.data() : {};
+      const datos = await api.miPerfil();
 
       profile = {
         name: datos.nombre || "",
         lastname: datos.apellido || "",
         email: datos.email || auth.currentUser?.email || "",
-        city: datos.ciudad || "",
-        rate: datos.tarifa != null ? String(datos.tarifa) : "",
-        presentation: datos.presentacion || "",
-        photo: datos.fotoURL || ""
+        photo: datos.fotoURL || "",
+        datos // datos profesionales vigentes (los aprobados)
       };
 
-      // Disponibilidad guardada en el documento del tutor
+      // Disponibilidad guardada en el perfil del tutor
       if (Array.isArray(datos.disponibilidad)) {
         blocks = datos.disponibilidad;
       }
 
       aplicarPerfilTutor();
-      if (nota) nota.textContent = "Tu perfil se carga desde tu cuenta. Los cambios se guardan en tu perfil.";
+      llenarFormularioProfesional();
+      if (nota) {
+        nota.textContent = "Nombre, apellido y foto se guardan al instante. Los datos profesionales los aprueba un administrador.";
+      }
     } catch (err) {
       console.warn("No se pudo cargar el perfil:", err);
       if (nota) nota.textContent = "No se pudo cargar tu perfil. Revisa tu conexión.";
     }
   }
 
-  async function cargarSolicitudes(uid) {
+  // Solo la disponibilidad: el servidor la modifica al completar una tutoría, así que se
+  // vuelve a leer sin tocar el formulario del perfil (que la persona puede estar editando).
+  async function cargarDisponibilidad() {
     try {
-      const q = query(collection(db, "solicitudes"), where("tutorId", "==", uid));
-      const snap = await getDocs(q);
-      solicitudesData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      // Ordenar en el cliente: más reciente primero
-      solicitudesData.sort((a, b) => {
-        const ta = a.creadaEn?.toMillis?.() ?? 0;
-        const tb = b.creadaEn?.toMillis?.() ?? 0;
-        return tb - ta;
-      });
+      const datos = await api.miPerfil();
+      if (Array.isArray(datos.disponibilidad)) blocks = datos.disponibilidad;
+    } catch (err) {
+      console.warn("No se pudo actualizar la disponibilidad:", err);
+    }
+  }
+
+  // Las tres listas llegan ya ordenadas (más reciente primero). Cada función devuelve
+  // true si llegaron datos distintos a los que ya había, para repintar solo cuando haga falta.
+  async function cargarSolicitudes() {
+    try {
+      const nuevas = await api.misSolicitudes();
+      const cambio = !sonIguales(nuevas, solicitudesData);
+      solicitudesData = nuevas;
+      return cambio;
     } catch (err) {
       console.warn("No se pudieron cargar las solicitudes:", err);
+      return false;
     }
   }
 
-  async function cargarTutorias(uid) {
+  async function cargarTutorias() {
     try {
-      const q = query(collection(db, "tutorias"), where("tutorId", "==", uid));
-      const snap = await getDocs(q);
-      tutoriasData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      // Ordenar en el cliente: más reciente primero
-      tutoriasData.sort((a, b) => {
-        const ta = a.creadaEn?.toMillis?.() ?? 0;
-        const tb = b.creadaEn?.toMillis?.() ?? 0;
-        return tb - ta;
-      });
+      const nuevas = await api.misTutorias();
+      const cambio = !sonIguales(nuevas, tutoriasData);
+      tutoriasData = nuevas;
+      return cambio;
     } catch (err) {
       console.warn("No se pudieron cargar las tutorías:", err);
+      return false;
     }
   }
 
-  async function cargarCalificaciones(uid) {
+  async function cargarCalificaciones() {
     try {
-      const q = query(collection(db, "calificaciones"), where("tutorId", "==", uid));
-      const snap = await getDocs(q);
-      calificacionesData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const nuevas = await api.misCalificaciones();
+      const cambio = !sonIguales(nuevas, calificacionesData);
+      calificacionesData = nuevas;
+      return cambio;
     } catch (err) {
       console.warn("No se pudieron cargar las calificaciones:", err);
+      return false;
     }
   }
 
-  async function cargarTodo(uid) {
-    tutorUid = uid;
+  async function cargarTodo() {
     await Promise.all([
-      cargarPerfilTutor(uid),
-      cargarSolicitudes(uid),
-      cargarTutorias(uid),
-      cargarCalificaciones(uid)
+      cargarPerfilTutor(),
+      cargarSolicitudes(),
+      cargarTutorias(),
+      cargarCalificaciones(),
+      cargarSolicitudCambio(),
+      bandeja.cargar(),
+      cargarMaterias().then(pintarMateriasPerfil)
     ]);
     renderAll();
     navigate();
   }
 
-  function suscribirDatos(uid) {
-    cancelarEscuchas.forEach((cancelar) => cancelar());
-    cancelarEscuchas = [
-      onSnapshot(query(collection(db, "solicitudes"), where("tutorId", "==", uid)), (snap) => {
-        solicitudesData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  // Sin escuchas en tiempo real: cada 30 s (con la pestaña visible) se vuelven a pedir las
+  // tres listas y solo se repinta si algo cambió.
+  function sincronizarDatos() {
+    if (detenerSondeo) detenerSondeo();
+    detenerSondeo = sondear(async () => {
+      const estadoAnterior = solicitudCambio?.estado;
+      const cambios = await Promise.all([
+        cargarSolicitudes(), cargarTutorias(), cargarCalificaciones(), cargarSolicitudCambio(),
+        bandeja.cargar() // repinta sola la campana si hay algo nuevo
+      ]);
+
+      // Un administrador respondió la solicitud de actualización mientras el panel estaba abierto.
+      if (estadoAnterior === "pendiente" && solicitudCambio?.estado !== "pendiente") {
+        if (solicitudCambio?.estado === "aprobada") {
+          await cargarPerfilTutor(); // trae los datos nuevos y la disponibilidad ya ajustada
+          showToast("Un administrador aprobó la actualización de tus datos.");
+        } else {
+          showToast("Un administrador respondió tu solicitud de actualización. Revisa «Mi perfil».");
+        }
         renderAll();
-      }, (err) => console.warn("No se pudieron sincronizar las solicitudes:", err)),
-      onSnapshot(query(collection(db, "tutorias"), where("tutorId", "==", uid)), (snap) => {
-        tutoriasData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      } else if (cambios.some(Boolean)) {
         renderAll();
-      }, (err) => console.warn("No se pudieron sincronizar las tutorías:", err)),
-      onSnapshot(query(collection(db, "calificaciones"), where("tutorId", "==", uid)), (snap) => {
-        calificacionesData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        renderAll();
-      }, (err) => console.warn("No se pudieron sincronizar las calificaciones:", err))
-    ];
+      }
+    });
   }
 
   // ----------------------------------------------------------------
-  // Firestore: escritura de solicitudes y tutorías
+  // API: solicitudes y tutorías
   // ----------------------------------------------------------------
 
   async function aceptarSolicitud(solicitudId) {
@@ -1114,11 +1397,10 @@ import { api } from "./api.js";
       // solicitud, crea la tutoría (con enlace de Jitsi si es virtual) y envía los correos.
       await api.aceptarSolicitud(solicitudId);
 
-      // Recargar desde Firestore para tener el estado real y el id de la tutoría nueva
-      await Promise.all([cargarSolicitudes(tutorUid), cargarTutorias(tutorUid)]);
+      // Recargar desde la API para tener el estado real y el id de la tutoría nueva
+      await Promise.all([cargarSolicitudes(), cargarTutorias()]);
 
       $("#tutor-detail-dialog").close();
-      addNotification("Solicitud aceptada", `Aceptaste la solicitud de ${rawSol.estudianteNombre}.`);
       renderAll();
       showToast("Solicitud aceptada. La tutoría quedó programada.");
     } catch (err) {
@@ -1139,7 +1421,6 @@ import { api } from "./api.js";
       if (idx >= 0) solicitudesData[idx].estado = "rechazada";
 
       $("#tutor-detail-dialog").close();
-      addNotification("Solicitud rechazada", `Rechazaste la solicitud de ${rawSol.estudianteNombre}.`);
       renderAll();
       showToast("Solicitud rechazada.");
     } catch (err) {
@@ -1160,12 +1441,10 @@ import { api } from "./api.js";
       else                              await api.cancelarTutoria(tutoriaId);
       const idx = tutoriasData.findIndex((t) => t.id === tutoriaId);
       if (idx >= 0) tutoriasData[idx].estado = nuevoEstado;
+      // Al completar, el servidor descuenta ese horario de la disponibilidad del tutor.
+      if (nuevoEstado === "completada") await cargarDisponibilidad();
 
       $("#tutor-detail-dialog").close();
-      addNotification(
-        `Tutoría ${label}`,
-        `Actualizaste la tutoría con ${rawTut.estudianteNombre}.`
-      );
       renderAll();
       showToast(nuevoEstado === "completada"
         ? "Tutoría completada. El estudiante ya puede calificarla."
@@ -1173,16 +1452,6 @@ import { api } from "./api.js";
     } catch (err) {
       console.error("Error al actualizar tutoría:", err);
       showToast(err?.message || "No se pudo actualizar la tutoría. Revisa tu conexión.");
-    }
-  }
-
-  async function guardarDisponibilidad() {
-    if (!tutorUid) return;
-    try {
-      await updateDoc(doc(db, "usuarios", tutorUid), { disponibilidad: blocks });
-    } catch (err) {
-      console.error("Error al guardar disponibilidad:", err);
-      showToast("No se pudo guardar la disponibilidad. Revisa tu conexión.");
     }
   }
 
@@ -1274,7 +1543,7 @@ import { api } from "./api.js";
     renderCalificaciones();
   }
 
-  // Render inicial con datos vacíos mientras carga Firestore
+  // Render inicial con datos vacíos mientras carga la API
   renderAll();
   navigate();
 
@@ -1284,12 +1553,11 @@ import { api } from "./api.js";
 
   onAuthStateChanged(auth, async (usuario) => {
     if (usuario) {
-      await cargarTodo(usuario.uid);
-      suscribirDatos(usuario.uid);
-    } else {
-      cancelarEscuchas.forEach((cancelar) => cancelar());
-      cancelarEscuchas = [];
-      tutorUid = null;
+      await cargarTodo();
+      sincronizarDatos();
+    } else if (detenerSondeo) {
+      detenerSondeo();
+      detenerSondeo = null;
     }
   });
 })();

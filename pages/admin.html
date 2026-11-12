@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="../css/admin.css">
   <link rel="stylesheet" href="../css/configuracion.css">
   <link rel="stylesheet" href="../css/foto-perfil.css">
+  <link rel="stylesheet" href="../css/notificaciones.css">
 
   <script type="module" src="../js/admin.js"></script>
   <script type="module" src="../js/configuracion.js"></script>
@@ -160,9 +161,10 @@
           <svg class="icon" aria-hidden="true"><use href="#icon-book"></use></svg>
           <span>Materias</span>
         </a>
-        <a href="#tutorias">
-          <svg class="icon" aria-hidden="true"><use href="#icon-video"></use></svg>
-          <span>Tutorías</span>
+        <a href="#soporte">
+          <svg class="icon" aria-hidden="true"><use href="#icon-help"></use></svg>
+          <span>Soporte</span>
+          <span class="admin-nav-badge" id="admin-support-badge" hidden></span>
         </a>
         <a href="#calificaciones">
           <svg class="icon" aria-hidden="true"><use href="#icon-star"></use></svg>
@@ -432,7 +434,7 @@
             <div>
               <p class="admin-eyebrow">Solicitudes y perfiles</p>
               <h1 id="tutors-title">Tutores</h1>
-              <p>Aproba o rechaza las solicitudes de verificación y gestiona los perfiles de los tutores.</p>
+              <p>Aprueba o rechaza las solicitudes de verificación y las actualizaciones de datos que piden los tutores ya aprobados.</p>
             </div>
           </div>
 
@@ -445,6 +447,9 @@
             </button>
             <button type="button" data-tutor-status="rejected" aria-pressed="false">
               Rechazados <span data-tutor-count="rejected"></span>
+            </button>
+            <button type="button" data-tutor-status="updates" aria-pressed="false">
+              Actualizaciones <span data-tutor-count="updates"></span>
             </button>
           </div>
 
@@ -470,12 +475,21 @@
             <div>
               <p class="admin-eyebrow">Catálogo académico</p>
               <h1 id="subjects-title">Materias</h1>
-              <p>Catálogo de la plataforma con sus tutores, tutorías y calificaciones.</p>
+              <p>Catálogo de la plataforma con sus tutores, tutorías y calificaciones. Las materias que agregues aparecen al instante en el registro de tutores, en la búsqueda y en el panel del estudiante.</p>
             </div>
           </div>
 
           <div class="admin-subject-layout">
             <div class="admin-surface admin-subject-list-card">
+              <form class="admin-subject-add" id="admin-subject-form" novalidate>
+                <label class="admin-field">
+                  <span>Agregar materia</span>
+                  <input id="admin-subject-new" type="text" maxlength="40" autocomplete="off"
+                         placeholder="Ej.: Inglés técnico" aria-describedby="admin-subject-form-error">
+                </label>
+                <button class="btn btn-primary" type="submit" id="admin-subject-add">Agregar</button>
+                <p class="admin-form-error" id="admin-subject-form-error" role="alert"></p>
+              </form>
               <label class="admin-field">
                 <span>Buscar materia</span>
                 <input id="admin-subject-search" type="search" placeholder="Nombre de la materia">
@@ -498,13 +512,13 @@
           </div>
         </section>
 
-        <!-- Tutorías -->
-        <section id="tutorias" aria-labelledby="sessions-title" hidden>
+        <!-- Soporte -->
+        <section id="soporte" aria-labelledby="support-title" hidden>
           <div class="admin-page-heading">
             <div>
-              <p class="admin-eyebrow">Supervisión</p>
-              <h1 id="sessions-title">Tutorías</h1>
-              <p>Gestiona los casos de soporte que envían estudiantes y tutores desde su Centro de ayuda.</p>
+              <p class="admin-eyebrow">Atención al usuario</p>
+              <h1 id="support-title">Soporte</h1>
+              <p>Casos que envían estudiantes y tutores desde su Centro de ayuda. Ábrelos para leerlos y responderles: la respuesta les llega como notificación.</p>
             </div>
           </div>
 
@@ -578,11 +592,16 @@
             <div>
               <p class="admin-eyebrow">Novedades</p>
               <h1 id="admin-notifications-title">Notificaciones</h1>
-              <p>Solicitudes de tutores, reportes y comentarios que requieren tu atención.</p>
+              <p>Solicitudes de tutores, actualizaciones de datos y casos de soporte. Haz clic en una para abrirla.</p>
             </div>
-            <button class="btn btn-secondary" id="admin-notifications-back" type="button">
-              Volver
-            </button>
+            <div class="aviso-acciones">
+              <button class="btn btn-secondary aviso-leer-todas" id="admin-notifications-read-all" type="button">
+                Marcar todas como leídas
+              </button>
+              <button class="btn btn-secondary" id="admin-notifications-back" type="button">
+                Volver
+              </button>
+            </div>
           </div>
           <div class="admin-surface">
             <ul class="admin-notification-list" id="admin-notification-full"></ul>
@@ -730,7 +749,7 @@
             </div>
           </div>
           <div class="admin-surface config-faq">
-            <details><summary>¿Dónde veo los mensajes que envían estudiantes y tutores?</summary><p>En Tutorías. Cada mensaje del Centro de ayuda llega como caso «Abierto»; pásalo a revisión y márcalo como resuelto cuando respondas por correo.</p></details>
+            <details><summary>¿Dónde veo los mensajes que envían estudiantes y tutores?</summary><p>En Soporte. Cada mensaje del Centro de ayuda llega como caso «Abierto» y te avisa en la campana; ábrelo, escribe tu respuesta (le llega al usuario como notificación) y márcalo como resuelto.</p></details>
             <details><summary>¿Cómo modero una calificación?</summary><p>En Calificaciones pulsa «Editar calificación» para ajustar las estrellas, dejar retroalimentación para el tutor u ocultarla del perfil público.</p></details>
             <details><summary>¿Cómo se convierte alguien en administrador?</summary><p>Por seguridad no se hace desde la app: en Firebase Console → Firestore → usuarios, cambia el campo «rol» del usuario a «admin».</p></details>
             <details><summary>¿Cómo cambio mi contraseña?</summary><p>En Configuración → Seguridad y cuenta. Te pediremos tu contraseña actual.</p></details>
@@ -762,6 +781,26 @@
     <div id="admin-tutor-detail"></div>
   </dialog>
 
+  <!-- Actualización de datos de un tutor -->
+  <dialog class="admin-dialog admin-dialog-wide" id="admin-change-dialog" aria-labelledby="admin-change-dialog-title">
+    <div class="admin-section-heading">
+      <h2 id="admin-change-dialog-title">Actualización de datos</h2>
+      <button class="admin-icon-button" type="button" data-close-dialog aria-label="Cerrar">
+        <svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+      </button>
+    </div>
+    <div id="admin-change-detail"></div>
+    <label class="admin-field admin-field-full">
+      <span>Mensaje para el tutor (opcional)</span>
+      <textarea id="admin-change-note" rows="3" maxlength="300" placeholder="Ej.: Falta adjuntar la hoja de vida actualizada."></textarea>
+    </label>
+    <p class="admin-form-error" id="admin-change-error" role="alert"></p>
+    <div class="admin-detail-actions">
+      <button class="btn btn-primary" type="button" id="admin-change-approve">Aprobar cambios</button>
+      <button class="btn btn-secondary" type="button" id="admin-change-reject">Rechazar</button>
+    </div>
+  </dialog>
+
   <!-- Detalle de caso de soporte -->
   <dialog class="admin-dialog" id="admin-case-dialog" aria-labelledby="admin-case-dialog-title">
     <div class="admin-section-heading">
@@ -771,9 +810,20 @@
       </button>
     </div>
     <div id="admin-case-detail"></div>
+    <form id="admin-case-form">
+      <label class="admin-field admin-field-full">
+        <span>Respuesta para el usuario</span>
+        <textarea id="admin-case-reply" rows="4" maxlength="1000" placeholder="Escribe lo que quieres responderle. Le llegará como notificación."></textarea>
+      </label>
+      <p class="admin-form-error" id="admin-case-error" role="alert"></p>
+      <div class="admin-detail-actions">
+        <button class="btn btn-primary" type="submit" id="admin-case-send-resolve">Responder y marcar resuelto</button>
+        <button class="btn btn-secondary" type="button" id="admin-case-send">Solo responder</button>
+      </div>
+    </form>
   </dialog>
 
-  <!-- Formulario para agregar materia -->
+  <!-- Editar calificación -->
   <dialog class="admin-dialog" id="admin-rating-dialog" aria-labelledby="admin-rating-dialog-title">
     <form id="admin-rating-form">
       <div class="admin-section-heading">
@@ -818,4 +868,4 @@
   <script type="module" src="../js/auth.js"></script>
 
 </body>
-</html>
+</html>

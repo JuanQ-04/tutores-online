@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="../css/estudiante.css">
   <link rel="stylesheet" href="../css/configuracion.css">
   <link rel="stylesheet" href="../css/foto-perfil.css">
+  <link rel="stylesheet" href="../css/notificaciones.css">
 </head>
 
 <body>
@@ -519,16 +520,25 @@
               <h1 id="notifications-title" tabindex="-1">
                 Todas las notificaciones
               </h1>
-              <p>Consulta las novedades de tus solicitudes y tutorías.</p>
+              <p>Consulta las novedades de tus solicitudes y tutorías. Haz clic en una para abrirla.</p>
             </div>
 
-            <button
-              class="notifications-back"
-              id="notifications-back"
-              type="button"
-            >
-              Volver
-            </button>
+            <div class="aviso-acciones">
+              <button
+                class="notifications-back aviso-leer-todas"
+                id="notifications-read-all"
+                type="button"
+              >
+                Marcar todas como leídas
+              </button>
+              <button
+                class="notifications-back"
+                id="notifications-back"
+                type="button"
+              >
+                Volver
+              </button>
+            </div>
           </div>
 
                     <ul class="notifications-full-list">
@@ -777,4 +787,4 @@
   <script type="module" src="../js/auth.js"></script>
 
 </body>
-</html>
+</html>

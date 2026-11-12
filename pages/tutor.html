@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="../css/configuracion.css">
   <link rel="stylesheet" href="../css/tutor-tutorias.css">
   <link rel="stylesheet" href="../css/foto-perfil.css">
+  <link rel="stylesheet" href="../css/notificaciones.css">
 
   <script type="module" src="../js/tutor.js"></script>
   <script type="module" src="../js/configuracion.js"></script>
@@ -437,11 +438,16 @@
             <div>
               <p class="tutor-eyebrow">Novedades</p>
               <h1 id="tutor-notifications-title">Notificaciones</h1>
-              <p>Movimientos de tus solicitudes y sesiones.</p>
+              <p>Movimientos de tus solicitudes y sesiones. Haz clic en una para ir a ella.</p>
             </div>
-            <button class="tutor-button is-outline" id="tutor-notifications-back" type="button">
-              Volver
-            </button>
+            <div class="aviso-acciones">
+              <button class="tutor-button is-outline aviso-leer-todas" id="tutor-notifications-read-all" type="button">
+                Marcar todas como leídas
+              </button>
+              <button class="tutor-button is-outline" id="tutor-notifications-back" type="button">
+                Volver
+              </button>
+            </div>
           </div>
           <div class="tutor-surface">
             <ul class="tutor-notification-list" id="tutor-notification-full"></ul>
@@ -495,18 +501,6 @@
                   <span>Correo electrónico</span>
                   <input id="tutor-email" type="email" value="" autocomplete="email" readonly required>
                 </label>
-                <label class="tutor-field">
-                  <span>Ciudad</span>
-                  <input id="tutor-city" type="text" value="" maxlength="80" required>
-                </label>
-                <label class="tutor-field">
-                  <span>Tarifa por hora (COP)</span>
-                  <input id="tutor-rate" type="number" value="" min="1000" step="1000" required>
-                </label>
-                <label class="tutor-field tutor-field-full">
-                  <span>Presentación</span>
-                  <textarea id="tutor-presentation" rows="4" maxlength="500" required></textarea>
-                </label>
               </div>
             </form>
 
@@ -531,6 +525,134 @@
               </div>
             </aside>
           </div>
+
+          <form class="tutor-surface tutor-professional" id="tutor-professional-form" novalidate aria-labelledby="tutor-professional-title">
+            <div class="tutor-section-heading">
+              <div>
+                <p class="tutor-eyebrow">Datos profesionales</p>
+                <h2 id="tutor-professional-title">Lo que ven los estudiantes</h2>
+              </div>
+            </div>
+            <p class="tutor-muted">
+              Estos datos no cambian al instante: al guardarlos se envía una solicitud de actualización
+              y un administrador la aprueba o la rechaza. Mientras tanto sigues con los datos actuales.
+            </p>
+
+            <div class="tutor-change-status" id="tutor-change-status" role="status" aria-live="polite" hidden></div>
+
+            <div class="tutor-profile-fields">
+              <label class="tutor-field tutor-field-full">
+                <span>Carrera o formación principal</span>
+                <input id="tutor-degree" type="text" list="tutor-careers" maxlength="80" autocomplete="off" required>
+                <datalist id="tutor-careers">
+                <option value="Ingeniería de Sistemas">
+                <option value="Ingeniería de Software">
+                <option value="Ingeniería Industrial">
+                <option value="Ingeniería Civil">
+                <option value="Ingeniería Electrónica">
+                <option value="Ingeniería de Telecomunicaciones">
+                <option value="Ingeniería Ambiental">
+                <option value="Ingeniería Química">
+                <option value="Administración de Empresas">
+                <option value="Contaduría Pública">
+                <option value="Economía">
+                <option value="Negocios Internacionales">
+                <option value="Mercadeo y Publicidad">
+                <option value="Medicina">
+                <option value="Enfermería">
+                <option value="Odontología">
+                <option value="Derecho">
+                <option value="Psicología">
+                <option value="Comunicación Social">
+                <option value="Trabajo Social">
+                <option value="Diseño Gráfico">
+                </datalist>
+              </label>
+              <label class="tutor-field">
+                <span>Nivel de estudios</span>
+                <select id="tutor-study-level" required>
+                  <option value="">Selecciona una opción</option>
+                  <option value="tecnico">Técnico o tecnólogo</option>
+                  <option value="pregrado-curso">Pregrado en curso</option>
+                  <option value="pregrado">Pregrado finalizado</option>
+                  <option value="posgrado">Posgrado</option>
+                </select>
+              </label>
+              <label class="tutor-field">
+                <span>Institución</span>
+                <input id="tutor-institution" type="text" maxlength="80" required>
+              </label>
+
+              <div class="tutor-field tutor-field-full" role="group" aria-labelledby="tutor-subjects-label">
+                <span id="tutor-subjects-label">Materias que enseñas</span>
+                <div class="tutor-check-grid" id="tutor-subjects-grid"></div>
+              </div>
+
+              <label class="tutor-field">
+                <span>Nivel al que enseñas</span>
+                <select id="tutor-teach-level" required>
+                  <option value="">Selecciona una opción</option>
+                  <option value="secundaria">Secundaria</option>
+                  <option value="universitario">Universitario</option>
+                  <option value="ambos">Secundaria y universitario</option>
+                </select>
+              </label>
+              <label class="tutor-field">
+                <span>Años de experiencia enseñando</span>
+                <input id="tutor-experience" type="number" min="0" max="60" step="1" required>
+              </label>
+
+              <label class="tutor-field">
+                <span>Modalidad</span>
+                <select id="tutor-modality" required>
+                  <option value="">Selecciona una opción</option>
+                  <option value="Virtual">Virtual</option>
+                  <option value="Presencial">Presencial</option>
+                  <option value="Virtual y presencial">Virtual y presencial</option>
+                </select>
+              </label>
+              <label class="tutor-field">
+                <span>Ciudad</span>
+                <input id="tutor-city" type="text" maxlength="60" autocomplete="address-level2" required>
+              </label>
+              <label class="tutor-field">
+                <span>Tarifa por hora (COP)</span>
+                <input id="tutor-rate" type="number" min="1000" step="1000" required>
+              </label>
+
+              <div class="tutor-field tutor-field-full" role="group" aria-labelledby="tutor-times-label">
+                <span id="tutor-times-label">Franjas de disponibilidad general</span>
+                <div class="tutor-check-grid" id="tutor-times-grid">
+                  <label class="tutor-check-option"><input type="checkbox" name="tutor-franja" value="manana"><span>Mañana</span></label>
+                  <label class="tutor-check-option"><input type="checkbox" name="tutor-franja" value="tarde"><span>Tarde</span></label>
+                  <label class="tutor-check-option"><input type="checkbox" name="tutor-franja" value="noche"><span>Noche</span></label>
+                </div>
+              </div>
+
+              <label class="tutor-field tutor-field-full">
+                <span>Presentación</span>
+                <textarea id="tutor-presentation" rows="4" maxlength="500" required></textarea>
+              </label>
+              <label class="tutor-field tutor-field-full">
+                <span>Hoja de vida (PDF, opcional)</span>
+                <input id="tutor-cv" type="file" accept="application/pdf" aria-describedby="tutor-cv-help">
+                <small class="tutor-muted" id="tutor-cv-help">
+                  Adjúntala solo si quieres reemplazar la actual. Máximo 700 KB; la ve únicamente el equipo administrador.
+                </small>
+              </label>
+            </div>
+
+            <p class="tutor-form-error" id="tutor-professional-error" role="alert"></p>
+            <div class="tutor-form-actions">
+              <button class="tutor-button" type="submit" id="tutor-professional-submit">
+                <svg class="icon" aria-hidden="true"><use href="#t-check"></use></svg>
+                Enviar solicitud de actualización
+              </button>
+              <button class="tutor-button is-outline" type="button" id="tutor-change-cancel" hidden>
+                Cancelar solicitud pendiente
+              </button>
+            </div>
+          </form>
 
           <section class="tutor-surface config-reviews" aria-labelledby="tutor-reviews-title">
             <div class="tutor-section-heading">
@@ -655,6 +777,7 @@
         </label>
       </div>
 
+      <p class="tutor-muted" id="tutor-block-mode-hint" hidden></p>
       <p class="tutor-form-error" id="tutor-block-error" role="alert"></p>
       <button class="tutor-button" type="submit">Agregar bloque</button>
     </form>

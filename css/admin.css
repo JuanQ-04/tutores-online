@@ -1226,3 +1226,119 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Agregar materia */
+.admin-subject-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-subject-add .admin-field {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.admin-subject-add .btn {
+  flex-shrink: 0;
+}
+
+.admin-subject-add .admin-form-error {
+  flex-basis: 100%;
+  min-height: 0;
+  margin: 0;
+}
+
+.admin-subject-add .admin-form-error:empty {
+  display: none;
+}
+
+/* Actualizaciones de datos de los tutores */
+.admin-dialog-wide {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.admin-change-table {
+  width: 100%;
+  margin: 16px 0;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-change-table th,
+.admin-change-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--admin-border);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.admin-change-table th {
+  color: var(--admin-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-change-table td:first-child {
+  width: 26%;
+  font-weight: 700;
+}
+
+.admin-change-table td.is-new {
+  background: #f1faf8;
+}
+
+.admin-change-note {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff8e6;
+  color: #6b4e00;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Contador de casos abiertos en el menú */
+.admin-nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #c0392b;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.admin-nav-badge[hidden] {
+  display: none;
+}
+
+/* Respuesta ya enviada en un caso */
+.admin-case-reply {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f1faf8;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.admin-case-reply strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--admin-muted);
+  font-size: 12px;
+}
+
+#admin-case-form {
+  margin-top: 4px;
+}

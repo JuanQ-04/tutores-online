@@ -10,12 +10,13 @@ const nombreCompleto = (u) => `${u.nombre || ""} ${u.apellido || ""}`.trim();
 // Reglas de negocio de solicitudes: crear, aceptar, rechazar, cancelar.
 // Depende de abstracciones inyectadas (repositorios, notificaciones, videoconferencia, reloj).
 export class SolicitudService {
-  constructor({ usuarioRepo, solicitudRepo, tutoriaRepo, reservaRepo, notificaciones, videoconferencia, reloj }) {
+  constructor({ usuarioRepo, solicitudRepo, tutoriaRepo, reservaRepo, notificaciones, avisos, videoconferencia, reloj }) {
     this.usuarioRepo = usuarioRepo;
     this.solicitudRepo = solicitudRepo;
     this.tutoriaRepo = tutoriaRepo;
     this.reservaRepo = reservaRepo;
     this.notificaciones = notificaciones;
+    this.avisos = avisos;
     this.videoconferencia = videoconferencia;
     this.reloj = reloj;
   }
@@ -69,6 +70,12 @@ export class SolicitudService {
     };
     const id = await this.solicitudRepo.crear(datos);
     await this.notificaciones.nuevaSolicitud({ tutor, solicitud: datos });
+    await this.avisos.avisar(tutorId, {
+      tipo: "solicitud-nueva",
+      titulo: "Nueva solicitud de tutoría",
+      detalle: `${datos.estudianteNombre} pidió ${materia} el ${fecha}, de ${horaInicio} a ${horaFin} (${bloque.modalidad}).`,
+      destino: { seccion: "solicitudes", id }
+    });
     return { id, ...datos };
   }
 
@@ -122,6 +129,12 @@ export class SolicitudService {
     // Fuera de la transacción (puede reintentarse): correos con el registro de la tutoría.
     const estudiante = await this.usuarioRepo.obtenerPorId(solicitud.estudianteId);
     await this.notificaciones.tutoriaProgramada({ tutor: usuario, estudiante, tutoria });
+    await this.avisos.avisar(solicitud.estudianteId, {
+      tipo: "solicitud-aceptada",
+      titulo: "Tu tutoría fue confirmada",
+      detalle: `${tutoria.tutorNombre} aceptó tu solicitud de ${tutoria.materia}: ${tutoria.fecha}, de ${tutoria.horaInicio} a ${tutoria.horaFin}.`,
+      destino: { seccion: "tutorias", id: tutoria.id }
+    });
     return { solicitud: { id: solicitud.id, estado: "aceptada" }, tutoria };
   }
 
@@ -133,14 +146,26 @@ export class SolicitudService {
     });
     const estudiante = await this.usuarioRepo.obtenerPorId(sol.estudianteId);
     await this.notificaciones.solicitudRechazada({ estudiante, solicitud: sol });
+    await this.avisos.avisar(sol.estudianteId, {
+      tipo: "solicitud-rechazada",
+      titulo: "Tu solicitud fue rechazada",
+      detalle: `${sol.tutorNombre} no pudo atender tu solicitud de ${sol.materia} del ${sol.fecha}. Puedes buscar otro horario o tutor.`,
+      destino: { seccion: "tutorias" }
+    });
     return { id, estado: "rechazada" };
   }
 
   // ---------------------------------------------------------------- cancelar
   // El estudiante retira su solicitud pendiente (mismo estado "rechazada" que usa el frontend).
   async cancelar(usuario, id) {
-    await this.#cerrarPendiente(id, (s) => {
+    const sol = await this.#cerrarPendiente(id, (s) => {
       if (s.estudianteId !== usuario.id) throw new Prohibido("Esta solicitud no es tuya");
+    });
+    await this.avisos.avisar(sol.tutorId, {
+      tipo: "solicitud-cancelada",
+      titulo: "Solicitud cancelada",
+      detalle: `${sol.estudianteNombre} retiró su solicitud de ${sol.materia} del ${sol.fecha}.`,
+      destino: { seccion: "solicitudes", id }
     });
     return { id, estado: "rechazada" };
   }

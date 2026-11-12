@@ -7,10 +7,9 @@
 serviceAccount*.json
 secrets/
 
-# Firebase / Azure locales
+# Firebase locales
 .firebase/
 firebase-debug.log*
-.azure/
 
 # Dependencias y builds
 node_modules/

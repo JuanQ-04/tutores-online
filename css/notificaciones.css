@@ -1,0 +1,73 @@
+/* Notificaciones que se pueden abrir (campana y listado completo). Las usan los tres paneles. */
+.aviso-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.aviso-item:hover h2,
+.aviso-item:hover h3 {
+  text-decoration: underline;
+}
+
+.aviso-item:focus-visible {
+  outline: 2px solid #2b7fa3;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.aviso-item.is-unread h2::before,
+.aviso-item.is-unread h3::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #1b84c4;
+  vertical-align: middle;
+}
+
+.aviso-item p {
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.aviso-item.is-compact p {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.aviso-meta {
+  display: block;
+  margin-top: 6px;
+  color: #6b7c88;
+  font-size: 11px;
+}
+
+.aviso-vacio {
+  margin: 0;
+  color: #6b7c88;
+  font-size: 13px;
+}
+
+.aviso-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.aviso-leer-todas[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}

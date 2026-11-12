@@ -1,20 +1,11 @@
 // js/estudiante.js — Panel del estudiante
 // Requiere: <script type="module" src="../js/estudiante.js"></script>
 // Perfil, Inicio, Mis tutorías, Notificaciones, Buscar tutores, Reservar y
-// Calificaciones: conectados a Firestore. Seguridad y Centro de ayuda los maneja
+// Calificaciones: todo viaja por la API (js/api.js); este panel nunca habla directo con
+// la base de datos. Seguridad y Centro de ayuda los maneja
 // js/configuracion.js (compartido con el tutor y el administrador).
 
-import { auth, db } from "./firebase-config.js";
-import {
-  doc,
-  getDoc,
-  updateDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-  onSnapshot
-} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { auth } from "./firebase-config.js";
 import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
@@ -25,7 +16,9 @@ import {
   activarSelectorFoto,
   guardarFotoPerfil
 } from "./foto-perfil.js";
-import { api } from "./api.js";
+import { api, aMillis, sondear, sonIguales } from "./api.js";
+import { cargarMaterias, nombreMateria, llenarSelectMaterias } from "./materias.js";
+import { crearBandeja, htmlAviso, activarClics } from "./notificaciones.js";
 
 /* ================================================================
    0. Utilidades globales
@@ -63,12 +56,9 @@ function dateISO(date) {
   ].join("-");
 }
 
+// La API entrega "fecha" como "YYYY-MM-DD"; si faltara, se usa hoy.
 function tsToISO(fecha) {
-  if (!fecha) return dateISO(new Date());
-  if (typeof fecha.toDate === "function") return dateISO(fecha.toDate());
-  if (fecha instanceof Date) return dateISO(fecha);
-  if (typeof fecha === "string") return fecha.slice(0, 10);
-  return dateISO(new Date());
+  return typeof fecha === "string" && fecha ? fecha.slice(0, 10) : dateISO(new Date());
 }
 
 function formatDate(iso) {
@@ -100,22 +90,10 @@ function horaISO(date) {
   ].join(":");
 }
 
-/* Las materias se guardan en Firestore como "slug" (registro-tutor.html usa
-   value="matematicas", "fisica"…). Aquí se traducen a su nombre para mostrarlas
-   y para que el filtro de Buscar coincida con lo que eligió el tutor. */
-const MATERIAS = {
-  matematicas: "Matemáticas",
-  fisica: "Física",
-  quimica: "Química",
-  programacion: "Programación",
-  idiomas: "Idiomas",
-  estadistica: "Estadística"
-};
-
-function materiaLabel(valor) {
-  const texto = String(valor || "").trim();
-  return MATERIAS[normalize(texto)] || (texto.charAt(0).toUpperCase() + texto.slice(1));
-}
+/* Las materias se guardan en la base de datos como identificador ("matematicas") y el catálogo
+   (js/materias.js, desde la API) las traduce a su nombre: así se muestran y así coincide el
+   filtro de Buscar con lo que eligió el tutor. El administrador puede agregar más. */
+const materiaLabel = nombreMateria;
 
 function materiasDe(tutor) {
   return (Array.isArray(tutor?.materias) ? tutor.materias : []).map(materiaLabel);
@@ -130,9 +108,10 @@ function iniciales(nombre, porDefecto = "?") {
     .map((p) => p[0].toUpperCase()).join("") || porDefecto;
 }
 
-/* Una consulta a Firestore que no responde nunca dejaría la pantalla en
-   "Cargando…" para siempre: tras 15 s se trata como error. */
-function conTimeout(promesa, ms = 15000) {
+/* Una petición que no responde nunca dejaría la pantalla en "Cargando…" para siempre.
+   Se espera hasta 60 s porque el plan gratuito de Render duerme el servidor tras un rato
+   sin uso y la primera petición puede tardar casi un minuto en despertarlo. */
+function conTimeout(promesa, ms = 60000) {
   let temporizador;
   const limite = new Promise((_, rechazar) => {
     temporizador = setTimeout(() => {
@@ -143,12 +122,8 @@ function conTimeout(promesa, ms = 15000) {
 }
 
 function detalleError(err) {
-  const code = err?.code || "";
-  if (code === "permission-denied") {
-    return "Firestore no permite esta lectura (permission-denied): hay que revisar las reglas de seguridad.";
-  }
-  if (code === "unavailable" || code === "timeout") return "Revisa tu conexión a internet.";
-  return code ? `(${code})` : "";
+  if (err?.code === "timeout") return "El servidor tardó demasiado en responder. Revisa tu conexión.";
+  return err?.message || ""; // los errores de la API ya traen el mensaje en español
 }
 
 function botonReintentar(que) {
@@ -161,12 +136,11 @@ function botonReintentar(que) {
 let estudianteUid   = null;
 let profile         = { name: "", lastname: "", email: "", fotoURL: "" };
 let enviandoSolicitud = false; // evita enviar la misma solicitud dos veces
-let solicitudesData = [];   // docs de "solicitudes" del estudiante
-let tutoriasData    = [];   // docs de "tutorias" del estudiante
-let tutoresData     = [];   // docs de "usuarios" (tutores aprobados)
+let solicitudesData = [];   // solicitudes del estudiante (GET /solicitudes/mias)
+let tutoresData     = [];   // tutores aprobados con promedio y horarios libres (GET /tutores)
+let tutoriasData    = [];   // tutorías del estudiante (GET /tutorias/mias)
 let misCalificaciones = {}; // tutoriaId → calificación que dio este estudiante
-let cancelarEscuchasEstudiante = []; // listeners Firestore del usuario actual
-let resumenCalif    = {};   // tutorId → { promedio, total, comentarios[] } (solo visibles)
+let detenerSondeo   = null; // cancela la actualización periódica del panel
 let enviandoCalif   = false;
 let selectedSession = null; // { id, tipo: "solicitud"|"tutoria" }
 let reservaTutor    = null; // tutor elegido para reservar
@@ -327,7 +301,7 @@ let doRefreshTutores   = null;
 }
 
 /* ================================================================
-   3. Perfil del estudiante (Firestore)
+   3. Perfil del estudiante (API)
    ================================================================ */
 function aplicarPerfil() {
   const fullName   = `${profile.name} ${profile.lastname}`.trim();
@@ -360,12 +334,11 @@ function aplicarPerfil() {
   }
 }
 
-async function cargarPerfil(uid) {
+async function cargarPerfil() {
   const nota = $("#profile-note");
   if (nota) nota.textContent = "Cargando tu perfil…";
   try {
-    const snap = await getDoc(doc(db, "usuarios", uid));
-    const d = snap.exists() ? snap.data() : {};
+    const d = await api.miPerfil();
     profile = {
       name:     d.nombre   || "",
       lastname: d.apellido || "",
@@ -404,14 +377,13 @@ async function cargarPerfil(uid) {
         return;
       }
 
-      const usuario = auth.currentUser;
-      if (!usuario) {
+      if (!auth.currentUser) {
         if (profileNote) profileNote.textContent = "Tu sesión expiró. Vuelve a iniciar sesión.";
         return;
       }
 
       try {
-        await updateDoc(doc(db, "usuarios", usuario.uid), {
+        await api.actualizarPerfil({
           nombre:   nameInput.value,
           apellido: lastInput.value
         });
@@ -422,7 +394,7 @@ async function cargarPerfil(uid) {
         showDemoToast("Perfil actualizado.");
       } catch (err) {
         console.error("Error al guardar perfil:", err);
-        if (profileNote) profileNote.textContent = "No se pudo guardar el perfil. Revisa tu conexión.";
+        if (profileNote) profileNote.textContent = err?.message || "No se pudo guardar el perfil. Revisa tu conexión.";
       }
     });
   }
@@ -447,7 +419,7 @@ activarSelectorFoto(
 );
 
 /* ================================================================
-   4. Mis tutorías — normalización y carga (Firestore)
+   4. Mis tutorías — normalización y carga (API)
    ================================================================ */
 const STATUS_KEYS  = ["upcoming", "pending", "completed", "cancelled"];
 const ESTADO_LABEL = {
@@ -502,14 +474,11 @@ function normalizarTutoria(raw) {
   };
 }
 
-async function cargarTutorias(uid) {
+async function cargarTutorias() {
   try {
-    const [solSnap, tutSnap] = await conTimeout(Promise.all([
-      getDocs(query(collection(db, "solicitudes"), where("estudianteId", "==", uid))),
-      getDocs(query(collection(db, "tutorias"),    where("estudianteId", "==", uid)))
-    ]));
-    solicitudesData = solSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    tutoriasData    = tutSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const [solicitudes, tutorias] = await conTimeout(Promise.all([api.misSolicitudes(), api.misTutorias()]));
+    solicitudesData = solicitudes;
+    tutoriasData    = tutorias;
     tutoriasEstado  = "listo";
     tutoriasError   = null;
   } catch (err) {
@@ -517,48 +486,41 @@ async function cargarTutorias(uid) {
     tutoriasEstado = "error";
     tutoriasError  = err;
   }
-  await cargarMisCalificaciones(uid);
+  await cargarMisCalificaciones();
 }
 
-/* Calificaciones que este estudiante ya dio. Si falla (p. ej. reglas sin
-   actualizar) no rompe Mis tutorías: solo no se muestran. */
-async function cargarMisCalificaciones(uid) {
+/* Calificaciones que este estudiante ya dio. Si falla no rompe Mis tutorías: solo no se muestran. */
+async function cargarMisCalificaciones() {
   try {
-    const snap = await conTimeout(getDocs(query(
-      collection(db, "calificaciones"),
-      where("estudianteId", "==", uid)
-    )));
+    const lista = await conTimeout(api.misCalificaciones());
     misCalificaciones = {};
-    snap.docs.forEach((d) => { misCalificaciones[d.id] = { id: d.id, ...d.data() }; });
+    lista.forEach((c) => { misCalificaciones[c.id] = c; }); // el id de la calificación es el de la tutoría
   } catch (err) {
     console.warn("No se pudieron cargar tus calificaciones:", err);
   }
 }
 
-function suscribirDatosEstudiante(uid) {
-  cancelarEscuchasEstudiante.forEach((cancelar) => cancelar());
-  cancelarEscuchasEstudiante = [
-    onSnapshot(query(collection(db, "solicitudes"), where("estudianteId", "==", uid)), (snap) => {
-      solicitudesData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      refrescarVistas();
-    }, (err) => console.warn("No se pudieron sincronizar las solicitudes:", err)),
-    onSnapshot(query(collection(db, "tutorias"), where("estudianteId", "==", uid)), (snap) => {
-      tutoriasData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      tutoriasEstado = "listo";
-      tutoriasError = null;
-      refrescarVistas();
-    }, (err) => {
-      console.warn("No se pudieron sincronizar las tutorías:", err);
-      tutoriasEstado = "error";
-      tutoriasError = err;
-      refrescarVistas();
-    }),
-    onSnapshot(query(collection(db, "calificaciones"), where("estudianteId", "==", uid)), (snap) => {
-      misCalificaciones = {};
-      snap.docs.forEach((d) => { misCalificaciones[d.id] = { id: d.id, ...d.data() }; });
-      refrescarVistas();
-    }, (err) => console.warn("No se pudieron sincronizar tus calificaciones:", err))
-  ];
+/* Sin escuchas en tiempo real: cada 30 s (con la pestaña visible) se vuelven a pedir las
+   listas y solo se repinta si algo cambió. */
+function sincronizarDatos() {
+  if (detenerSondeo) detenerSondeo();
+  detenerSondeo = sondear(async () => {
+    const [solicitudes, tutorias, calificaciones] =
+      await Promise.all([api.misSolicitudes(), api.misTutorias(), api.misCalificaciones(), bandeja.cargar()]);
+
+    const mapa = {};
+    calificaciones.forEach((c) => { mapa[c.id] = c; });
+    const cambio = !sonIguales(solicitudes, solicitudesData)
+      || !sonIguales(tutorias, tutoriasData)
+      || !sonIguales(mapa, misCalificaciones);
+
+    solicitudesData = solicitudes;
+    tutoriasData = tutorias;
+    misCalificaciones = mapa;
+    tutoriasEstado = "listo";
+    tutoriasError = null;
+    if (cambio) refrescarVistas();
+  });
 }
 
 function getItemsByTab(tab) {
@@ -772,7 +734,7 @@ function renderDetail() {
 }
 
 /* ================================================================
-   6b. Calificar una tutoría completada (Firestore: calificaciones)
+   6b. Calificar una tutoría completada (API: calificaciones)
    ================================================================ */
 function renderCalificacionDetalle(item) {
   const box = $("#detail-rating");
@@ -847,7 +809,7 @@ document.addEventListener("submit", async (event) => {
     misCalificaciones[raw.id] = { id: raw.id, ...creada };
     refrescarVistas();
     renderDetail();
-    cargarResumenCalificaciones().then(() => doRefreshTutores?.());
+    cargarTutores().then(() => doRefreshTutores?.()); // el promedio del tutor cambió
     showDemoToast("¡Gracias! Tu calificación quedó guardada.");
   } catch (err) {
     console.error("Error al calificar:", err);
@@ -923,20 +885,20 @@ document.addEventListener("submit", async (event) => {
 }
 
 /* ================================================================
-   7. Buscar tutores (Firestore)
+   7. Buscar tutores (API)
    ================================================================ */
 async function cargarTutores() {
   tutoresEstado = "cargando";
   tutoresError  = null;
   try {
-    // La API devuelve solo tutores aprobados, con horarios futuros y sin choques.
+    // La API devuelve solo tutores aprobados, con horarios futuros y sin choques,
+    // y con su promedio de estrellas (promedio, opiniones) ya calculado.
     const { tutores } = await conTimeout(api.buscarTutores({ limite: 100 }));
     tutoresData = tutores;
-    await cargarResumenCalificaciones();
     tutoresEstado = "listo";
     if (!tutoresData.length) {
       console.info(
-        "[Buscar tutores] La API respondió pero no devolvió tutores. En Firestore → usuarios, " +
+        "[Buscar tutores] La API respondió pero no devolvió tutores. En la base de datos, " +
         "un tutor solo aparece si tiene rol = \"tutor\" y estado = \"aprobado\" o \"aceptado\" (exactamente así, en minúsculas)."
       );
     }
@@ -948,44 +910,11 @@ async function cargarTutores() {
   }
 }
 
-/* Promedio de cada tutor a partir de las calificaciones visibles. */
-async function cargarResumenCalificaciones() {
-  try {
-    const snap = await conTimeout(getDocs(query(
-      collection(db, "calificaciones"),
-      where("estado", "==", "visible")
-    )));
-    const mapa = {};
-    snap.docs.forEach((d) => {
-      const c = d.data();
-      if (!c.tutorId) return;
-      const r = mapa[c.tutorId] || (mapa[c.tutorId] = { suma: 0, total: 0, comentarios: [] });
-      r.suma  += Number(c.estrellas) || 0;
-      r.total += 1;
-      if (c.comentario) {
-        r.comentarios.push({
-          texto: c.comentario,
-          estrellas: c.estrellas,
-          autor: String(c.estudianteNombre || "Estudiante").split(" ")[0],
-          ts: c.creadaEn?.toMillis?.() ?? 0
-        });
-      }
-    });
-    Object.values(mapa).forEach((r) => {
-      r.promedio = r.total ? r.suma / r.total : 0;
-      r.comentarios.sort((a, b) => b.ts - a.ts);
-    });
-    resumenCalif = mapa;
-  } catch (err) {
-    console.warn("No se pudieron cargar las calificaciones de los tutores:", err);
-    resumenCalif = {};
-  }
-}
-
+/* Promedio y número de opiniones: ya vienen en cada tutor de la API. */
 function textoCalificacion(tutorId) {
-  const r = resumenCalif[tutorId];
-  if (!r || !r.total) return "Sin calificaciones aún";
-  return `★ ${r.promedio.toFixed(1)} (${r.total} ${r.total === 1 ? "opinión" : "opiniones"})`;
+  const t = tutoresData.find((x) => x.id === tutorId);
+  if (!t || !t.opiniones) return "Sin calificaciones aún";
+  return `★ ${t.promedio.toFixed(1)} (${t.opiniones} ${t.opiniones === 1 ? "opinión" : "opiniones"})`;
 }
 
 const TONES = ["tone-green", "tone-blue", "tone-sand"];
@@ -1105,16 +1034,16 @@ function tutorCardHtml(tutor, index) {
 
         const matchSubject = subject === "Todas las materias" || materias.includes(subject);
 
+        // Modalidad del perfil del tutor (no la de sus bloques): «Presencial» incluye a quien
+        // eligió «Virtual y presencial», y lo mismo con «Virtual».
         const matchMod = mod === "Cualquier modalidad" ||
-          (tutor.disponibilidad || []).some(
-            (b) => b.modalidad === mod || b.modalidad === "Virtual y presencial"
-          );
+          normalize(tutor.modalidad || "").includes(normalize(mod));
 
         return matchText && matchSubject && matchMod;
       });
 
       if (order === "Calificacion") {
-        const prom = (t) => resumenCalif[t.id]?.promedio || 0;
+        const prom = (t) => t.promedio || 0;
         filtered.sort((a, b) => prom(b) - prom(a) || nombreDe(a).localeCompare(nombreDe(b), "es"));
       } else if (order === "Disponibilidad") {
         filtered.sort((a, b) => (b.disponibilidad?.length || 0) - (a.disponibilidad?.length || 0));
@@ -1136,11 +1065,19 @@ function tutorCardHtml(tutor, index) {
 
     // Exponer para llamar después de cargar Firebase
     doRefreshTutores = renderTutores;
+
+    // Catálogo vivo: llena el filtro de materias (con las que agregó el administrador) y
+    // vuelve a pintar, porque los nombres de las tarjetas dependen de él.
+    cargarMaterias().then(() => {
+      llenarSelectMaterias(subjectSelect, { placeholder: "Todas las materias", valor: "nombre" });
+      renderTutores();
+      refrescarVistas();
+    });
   }
 }
 
 /* ================================================================
-   8. Perfil del tutor: diálogo (datos reales de Firestore)
+   8. Perfil del tutor: diálogo (datos reales de la API)
    ================================================================ */
 function buildTutorDialog() {
   const existing = $("#tutor-profile-dialog");
@@ -1205,12 +1142,18 @@ function openTutorProfile(tutorId) {
     ? `Tarifa: $${Number(tutor.tarifa).toLocaleString("es-CO")}/hora` : "";
 
   $("#tp-score", dialog).textContent = textoCalificacion(tutor.id);
-  const resumen = resumenCalif[tutor.id];
-  $("#tp-reviews", dialog).innerHTML = resumen?.comentarios?.length
-    ? `<ul class="tp-review-list">${resumen.comentarios.slice(0, 3).map((c) => `
-        <li><span class="rating-readonly is-small">${estrellasTexto(c.estrellas)}</span>
-        <p>"${escapeHTML(c.texto)}"</p><small>— ${escapeHTML(c.autor)}</small></li>`).join("")}</ul>`
-    : "";
+  // Los comentarios más recientes se piden a la API al abrir el perfil (son públicos).
+  const reseñas = $("#tp-reviews", dialog);
+  reseñas.innerHTML = "";
+  api.calificacionesDeTutor(tutor.id).then((lista) => {
+    if (!dialog.open || $("#tp-title", dialog).textContent !== nombre) return; // ya cerraron o cambiaron de tutor
+    const comentarios = lista.filter((c) => c.comentario).slice(0, 3);
+    reseñas.innerHTML = comentarios.length
+      ? `<ul class="tp-review-list">${comentarios.map((c) => `
+          <li><span class="rating-readonly is-small">${estrellasTexto(c.estrellas)}</span>
+          <p>"${escapeHTML(c.comentario)}"</p><small>— ${escapeHTML(String(c.estudianteNombre || "Estudiante").split(" ")[0])}</small></li>`).join("")}</ul>`
+      : "";
+  }).catch((err) => console.warn("No se pudieron cargar las opiniones del tutor:", err));
 
   const schedEl = $("#tp-schedule", dialog);
   if (disps.length > 0) {
@@ -1273,7 +1216,7 @@ document.addEventListener("click", (event) => {
 });
 
 /* ================================================================
-   10. Reservar tutoría (Firestore — crea solicitud)
+   10. Reservar tutoría (API — crea solicitud)
    ================================================================ */
 // Si el estudiante filtró por una materia que el tutor enseña, se reserva esa;
 // si no, la primera materia del tutor.
@@ -1299,7 +1242,15 @@ function iniciarReserva(tutor) {
   $("#reserva-ok").hidden   = true;
   const msg = $("#reserva-mensaje");
   if (msg) msg.value = "";
-  $$(".reserva-opcion[data-modo]", sec).forEach((b) => b.setAttribute("aria-pressed", "false"));
+  // Solo se ofrecen las modalidades que el tutor eligió en su perfil; si es una sola, ya queda elegida.
+  const ofrece = (modo) => !tutor.modalidad || tutor.modalidad === "Virtual y presencial" || tutor.modalidad === modo;
+  const botonesModo = $$(".reserva-opcion[data-modo]", sec);
+  const unica = botonesModo.filter((b) => ofrece(b.dataset.modo));
+  if (unica.length === 1) reservaModalidad = unica[0].dataset.modo;
+  botonesModo.forEach((b) => {
+    b.hidden = !ofrece(b.dataset.modo);
+    b.setAttribute("aria-pressed", String(b.dataset.modo === reservaModalidad));
+  });
 
   if (doRenderReserva) doRenderReserva(1);
   window.location.hash = "reservar";
@@ -1441,7 +1392,7 @@ function iniciarReserva(tutor) {
           return;
         }
 
-        // ── Paso 3: enviar solicitud a Firestore ──
+        // ── Paso 3: enviar la solicitud a la API ──
         if (!estudianteUid || !reservaTutor || !reservaBloque) {
           if (note) note.textContent = "Falta información. Vuelve al paso anterior.";
           return;
@@ -1470,7 +1421,7 @@ function iniciarReserva(tutor) {
           });
 
           // Recargar las solicitudes del estudiante y refrescar las pestañas
-          await cargarTutorias(estudianteUid);
+          await cargarTutorias();
           refrescarVistas();
 
           $("#reserva-card").hidden = true;
@@ -1505,7 +1456,7 @@ function iniciarReserva(tutor) {
    ================================================================ */
 
 /* ================================================================
-   13. Inicio y notificaciones (datos reales de Firestore)
+   13. Inicio y notificaciones (datos reales de la API)
    ================================================================ */
 function finDeSesion(item) {
   const [y, m, d] = item.date.split("-").map(Number);
@@ -1701,66 +1652,13 @@ function renderInicio() {
   }
 }
 
-/* ── Notificaciones: se generan a partir de tus solicitudes y tutorías ── */
-const CLAVE_NOTIF_VISTAS = "estudianteNotificacionesVistas:";
-
-function leerNotificacionesVistas() {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(CLAVE_NOTIF_VISTAS + estudianteUid) || "[]"));
-  } catch (_) {
-    return new Set();
-  }
-}
-
-function guardarNotificacionesVistas(vistas) {
-  try {
-    localStorage.setItem(CLAVE_NOTIF_VISTAS + estudianteUid, JSON.stringify([...vistas]));
-  } catch (_) { /* almacenamiento no disponible: no es crítico */ }
-}
-
-function construirNotificaciones() {
-  const lista = [];
-  const marca = (raw) =>
-    (raw.creadaEn?.toMillis?.() ?? Date.parse(`${tsToISO(raw.fecha)}T00:00:00`)) || 0;
-
-  solicitudesData.forEach((raw) => {
-    const s      = normalizarSolicitud(raw);
-    const cuando = `${formatDate(s.date)}, ${timeLabel(s.start)}`;
-    if (raw.estado === "pendiente") {
-      lista.push({
-        key: `sol:${raw.id}:pendiente`, ts: marca(raw), titulo: "Solicitud pendiente",
-        texto: `Tu solicitud con ${s.tutor} (${cuando}) espera respuesta.`
-      });
-    } else if (raw.estado === "rechazada") {
-      lista.push({
-        key: `sol:${raw.id}:rechazada`, ts: marca(raw), titulo: "Solicitud cerrada",
-        texto: `Tu solicitud con ${s.tutor} (${cuando}) fue rechazada o cancelada.`
-      });
-    }
-  });
-
-  tutoriasData.forEach((raw) => {
-    const t      = normalizarTutoria(raw);
-    const cuando = `${formatDate(t.date)}, ${timeLabel(t.start)}`;
-    const textos = {
-      programada: ["Tutoría confirmada", `Tu sesión con ${t.tutor} está confirmada para ${cuando}.`],
-      completada: ["Tutoría completada", misCalificaciones[raw.id]
-        ? `Tu sesión con ${t.tutor} figura como completada.`
-        : `Tu sesión con ${t.tutor} figura como completada. ¡Califícala desde Mis tutorías!`],
-      cancelada:  ["Tutoría cancelada",  `Tu sesión con ${t.tutor} (${cuando}) fue cancelada.`]
-    }[raw.estado];
-    if (textos) {
-      lista.push({ key: `tut:${raw.id}:${raw.estado}`, ts: marca(raw), titulo: textos[0], texto: textos[1] });
-    }
-  });
-
-  return lista.sort((a, b) => b.ts - a.ts);
-}
+/* ── Notificaciones: se guardan en la base de datos (siguen ahí al volver a entrar) ── */
+const bandeja = crearBandeja({ alCambiar: () => renderNotificaciones() });
 
 function pintarContadorNotificaciones(sinLeer) {
   const punto = $(".notification-dot");
   if (punto) {
-    punto.textContent   = String(sinLeer);
+    punto.textContent   = sinLeer > 9 ? "9+" : String(sinLeer);
     punto.style.display = sinLeer ? "" : "none";
   }
   const texto = $(".notifications-unread");
@@ -1769,59 +1667,61 @@ function pintarContadorNotificaciones(sinLeer) {
     "aria-label",
     sinLeer ? `Notificaciones, ${sinLeer} sin leer` : "Notificaciones"
   );
-}
-
-function marcarNotificacionesVistas() {
-  if (!estudianteUid || tutoriasEstado !== "listo") return;
-  const vistas = leerNotificacionesVistas();
-  construirNotificaciones().forEach((n) => vistas.add(n.key));
-  guardarNotificacionesVistas(vistas);
-  pintarContadorNotificaciones(0);
+  const todas = $("#notifications-read-all");
+  if (todas) todas.disabled = sinLeer === 0;
 }
 
 function renderNotificaciones() {
   $(".notifications-demo")?.remove();
   $("#notificaciones > .demo-notice")?.remove();
 
-  const vista   = $(".notifications-preview");
+  const vista    = $(".notifications-preview");
   const completa = $(".notifications-full-list");
   if (!vista && !completa) return;
 
-  const entrada = (n, h) => `
-    <li class="notification-entry${n.nueva ? " is-unread" : ""}">
+  const { avisos, sinLeer, cargado, fallo } = bandeja.estado;
+  const entrada = (a, h, compacto) => `
+    <li class="notification-entry${a.leida ? "" : " is-unread"}">
       <span class="notification-marker" aria-hidden="true"></span>
-      <div>
-        <${h}>${escapeHTML(n.titulo)}</${h}>
-        <p>${escapeHTML(n.texto)}</p>
-        <span class="notification-read-label">${n.nueva ? "Sin leer" : "Leída"}</span>
-      </div>
+      ${htmlAviso(a, { etiquetaTitulo: h, compacto })}
     </li>`;
-
   const sinDatos = (texto) => `
     <li class="notification-entry"><span class="notification-marker" aria-hidden="true"></span>
       <div><p>${texto}</p></div></li>`;
 
-  if (tutoriasEstado !== "listo") {
-    const texto = tutoriasEstado === "error"
-      ? "No pudimos cargar tus notificaciones."
-      : "Cargando tus notificaciones…";
-    if (vista)    vista.innerHTML    = sinDatos(texto);
-    if (completa) completa.innerHTML = sinDatos(texto);
-    pintarContadorNotificaciones(0);
-    return;
+  const vacio = sinDatos(!cargado
+    ? (fallo ? "No pudimos cargar tus notificaciones." : "Cargando tus notificaciones…")
+    : "Todavía no tienes notificaciones.");
+  if (vista)    vista.innerHTML    = avisos.length ? avisos.slice(0, 4).map((a) => entrada(a, "h3", true)).join("") : vacio;
+  if (completa) completa.innerHTML = avisos.length ? avisos.map((a) => entrada(a, "h2", false)).join("") : vacio;
+
+  pintarContadorNotificaciones(cargado ? sinLeer : 0);
+}
+
+// Al hacer clic en una notificación se marca como leída y se abre lo que anuncia.
+function abrirAviso(aviso) {
+  bandeja.leer(aviso.id);
+  const menu = $("#notifications-dropdown");
+  if (menu && !menu.hidden) {
+    menu.hidden = true;
+    $("#notifications-toggle")?.setAttribute("aria-expanded", "false");
   }
 
-  const vistas = leerNotificacionesVistas();
-  const items  = construirNotificaciones().map((n) => ({ ...n, nueva: !vistas.has(n.key) }));
-  const sinLeer = items.filter((n) => n.nueva).length;
-
-  const vacio = sinDatos("Todavía no tienes notificaciones.");
-  if (vista)    vista.innerHTML    = items.length ? items.slice(0, 3).map((n) => entrada(n, "h3")).join("") : vacio;
-  if (completa) completa.innerHTML = items.length ? items.slice(0, 30).map((n) => entrada(n, "h2")).join("") : vacio;
-
-  pintarContadorNotificaciones(sinLeer);
-  if (window.location.hash === "#notificaciones") marcarNotificacionesVistas();
+  const { seccion, id } = aviso.destino || {};
+  if (seccion === "tutorias" && id && tutoriasData.some((t) => t.id === id)) {
+    selectedSession = { id, tipo: "tutoria" };
+    if (window.location.hash === "#detalle-tutoria") renderDetail();
+    else window.location.hash = "detalle-tutoria";
+    return;
+  }
+  const destinos = ["inicio", "buscar", "tutorias", "notificaciones", "perfil", "seguridad", "ayuda"];
+  const hash = destinos.includes(seccion) ? seccion : "inicio";
+  if (window.location.hash !== `#${hash}`) window.location.hash = hash;
 }
+
+activarClics($(".notifications-preview"), bandeja, abrirAviso);
+activarClics($(".notifications-full-list"), bandeja, abrirAviso);
+$("#notifications-read-all")?.addEventListener("click", () => bandeja.leerTodas());
 
 /* ================================================================
    14. Entrada principal — onAuthStateChanged
@@ -1843,23 +1743,18 @@ async function reintentar(que) {
   } else {
     tutoriasEstado = "cargando";
     refrescarVistas();
-    await cargarTutorias(estudianteUid);
+    await cargarTutorias();
   }
   refrescarVistas();
 }
 
-// Al entrar a "Todas las notificaciones" se consideran vistas
-window.addEventListener("hashchange", () => {
-  if (window.location.hash === "#notificaciones") marcarNotificacionesVistas();
-});
-
-// Estado inicial mientras Firebase responde: "Cargando…", nunca datos de ejemplo
+// Estado inicial mientras responde la sesión y la API: "Cargando…", nunca datos de ejemplo
 refrescarVistas();
 
 onAuthStateChanged(auth, async (usuario) => {
   if (!usuario) {
-    cancelarEscuchasEstudiante.forEach((cancelar) => cancelar());
-    cancelarEscuchasEstudiante = [];
+    if (detenerSondeo) detenerSondeo();
+    detenerSondeo = null;
     estudianteUid = null;
     return; // auth.js redirige al login
   }
@@ -1867,9 +1762,10 @@ onAuthStateChanged(auth, async (usuario) => {
 
   // Los tres bloques cargan en paralelo y cada uno pinta su parte al llegar
   await Promise.all([
-    cargarPerfil(usuario.uid),
-    cargarTutorias(usuario.uid).then(refrescarVistas),
-    cargarTutores().then(refrescarVistas)
+    cargarPerfil(),
+    cargarTutorias().then(refrescarVistas),
+    cargarTutores().then(refrescarVistas),
+    bandeja.cargar()
   ]);
-  suscribirDatosEstudiante(usuario.uid);
+  sincronizarDatos();
 });

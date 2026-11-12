@@ -4,9 +4,17 @@ import * as v from "../utils/validar.js";
 const nombreCompleto = (u) => `${u.nombre || ""} ${u.apellido || ""}`.trim();
 
 export class CalificacionService {
-  constructor({ tutoriaRepo, calificacionRepo }) {
+  constructor({ tutoriaRepo, calificacionRepo, avisos }) {
     this.tutoriaRepo = tutoriaRepo;
     this.calificacionRepo = calificacionRepo;
+    this.avisos = avisos;
+  }
+
+  // Estudiante: las que dio. Tutor: las que recibió (incluye las que el administrador ocultó).
+  async listarMias(usuario) {
+    if (usuario.rol === "tutor") return this.calificacionRepo.listarPorTutor(usuario.id);
+    if (usuario.rol === "estudiante") return this.calificacionRepo.listarPorEstudiante(usuario.id);
+    throw new Prohibido("Solo estudiantes y tutores tienen calificaciones");
   }
 
   // Una calificación por tutoría, solo del estudiante, solo si la tutoría está completada.
@@ -34,6 +42,12 @@ export class CalificacionService {
       retroalimentacion: ""
     };
     await this.calificacionRepo.crear(tutoriaId, datos); // lanza Conflicto si ya existe
+    await this.avisos.avisar(tutoria.tutorId, {
+      tipo: "calificacion-nueva",
+      titulo: `Nueva calificación: ${estrellas} ${estrellas === 1 ? "estrella" : "estrellas"}`,
+      detalle: `${datos.estudianteNombre} calificó tu tutoría de ${tutoria.materia}.`,
+      destino: { seccion: "perfil" }
+    });
     return { id: tutoriaId, ...datos };
   }
 }

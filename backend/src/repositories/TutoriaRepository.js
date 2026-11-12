@@ -26,4 +26,9 @@ export class TutoriaRepository {
     const snap = await q.get();
     return snap.docs.map(aObjeto);
   }
+
+  async listarTodas() {
+    const snap = await this.#col.get();
+    return snap.docs.map(aObjeto).sort(porFechaDesc);
+  }
 }

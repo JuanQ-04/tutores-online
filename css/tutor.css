@@ -720,3 +720,76 @@
   color: #a93226;
   background-color: #fdf0ef;
 }
+
+/* Datos profesionales: solicitud de actualización que revisa un administrador */
+.tutor-professional {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.tutor-professional > p {
+  margin: 0;
+}
+
+.tutor-check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.tutor-check-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--tutor-border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--tutor-navy);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.tutor-check-option input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--tutor-accent);
+}
+
+.tutor-check-option:has(input:checked) {
+  border-color: var(--tutor-accent);
+  background: rgba(0, 143, 149, 0.08);
+}
+
+.tutor-check-option:focus-within {
+  outline: 2px solid var(--tutor-accent);
+  outline-offset: 2px;
+}
+
+.tutor-change-status {
+  padding: 14px 16px;
+  border: 1px solid var(--tutor-border);
+  border-radius: 10px;
+  background: var(--tutor-bg);
+  color: var(--tutor-navy);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.tutor-change-status.is-pending { border-color: #e0b04a; background: #fff8e6; }
+.tutor-change-status.is-approved { border-color: #4caf7d; background: #eefaf3; }
+.tutor-change-status.is-rejected { border-color: #d9776a; background: #fdf0ee; }
+
+.tutor-change-status ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.tutor-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}

@@ -2,28 +2,24 @@
 //
 // - Lee de la API (GET /api/tutores) los tutores aprobados y los muestra
 //   como catálogo. No requiere sesión para ver.
-// - Filtros: texto, materia, fecha y modalidad (según los bloques de
-//   disponibilidad que el tutor publicó).
+// - Filtros: texto, materia, fecha y modalidad. La modalidad es la que el tutor
+//   eligió en su perfil («Virtual», «Presencial» o «Virtual y presencial»); la fecha
+//   sí depende de los bloques de disponibilidad que publicó.
+// - Las materias vienen de la API (js/materias.js): las agrega el administrador.
 // - «Reservar» exige sesión: sin sesión → login.html.
 // - Lee los filtros que llegan desde la landing (?materia=...&disponibilidad=...).
 
 (() => {
   "use strict";
 
-  const MATERIAS = {
-    matematicas: "Matemáticas",
-    fisica: "Física",
-    quimica: "Química",
-    programacion: "Programación",
-    idiomas: "Idiomas",
-    estadistica: "Estadística"
-  };
+  let MAT = null; // módulo js/materias.js (se importa al cargar los datos)
 
   const TONES = ["tone-green", "tone-blue", "tone-sand"];
 
   let TUTORES = [];
   let estado = "cargando"; // cargando | listo | error
   let tutorEnDialogo = null;
+  let materiaPedida = null; // ?materia=… de la URL (puede ser una materia nueva, aún no cargada)
 
   const $ = (selector) => document.querySelector(selector);
 
@@ -71,8 +67,9 @@
   }
 
   function materiaLabel(valor) {
+    if (MAT) return MAT.nombreMateria(valor);
     const texto = String(valor || "").trim();
-    return MATERIAS[normalizar(texto)] || (texto.charAt(0).toUpperCase() + texto.slice(1));
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
   }
 
   function iniciales(nombre) {
@@ -100,6 +97,7 @@
     render();
     try {
       const { api } = await import("./api.js");
+      MAT = await import("./materias.js");
 
       try {
         FOTO = await import("./foto-perfil.js");
@@ -109,7 +107,16 @@
 
       // La API ya entrega solo tutores aprobados, con horarios futuros y libres,
       // y con el promedio de estrellas calculado.
+      // Catálogo vivo: incluye las materias que agregó el administrador. Se llena aparte de los
+      // tutores para que el filtro quede completo aunque la lista de tutores tarde o falle.
+      const catalogo = MAT.cargarMaterias().then(() => {
+        MAT.llenarSelectMaterias(fMateria, { placeholder: "Todas las materias" });
+        if (materiaPedida && [...fMateria.options].some((o) => o.value === materiaPedida)) {
+          fMateria.value = materiaPedida;
+        }
+      });
       const { tutores } = await api.buscarTutores({ limite: 100 });
+      await catalogo;
 
       TUTORES = tutores.map((t, i) => {
         const nombre = `${t.nombre || ""} ${t.apellido || ""}`.trim() || "Tutor";
@@ -118,6 +125,7 @@
           id: t.id,
           name: nombre,
           materias,
+          modalidad: t.modalidad || "",
           subject: materias.map(materiaLabel).join(", ") || "General",
           titulo: t.titulo || "Profesional",
           lugar: t.ciudad || "Colombia",
@@ -155,14 +163,13 @@
         normalizar(t.bio).includes(texto);
       const coincideMateria = !materia || t.materias.some((m) => normalizar(m) === materia);
 
-      // Fecha y modalidad se evalúan sobre los mismos bloques
-      const coincideBloque = !fecha && !modalidad
-        ? true
-        : t.disponibilidad.some((b) =>
-            (!fecha || b.fecha === fecha) &&
-            (!modalidad || normalizar(b.modalidad) === modalidad));
+      // Modalidad: la del perfil del tutor. «Presencial» incluye a quien eligió
+      // «Virtual y presencial», y lo mismo con «Virtual».
+      const coincideModalidad = !modalidad || normalizar(t.modalidad).includes(modalidad);
+      // Fecha: el tutor debe tener un horario libre ese día.
+      const coincideFecha = !fecha || t.disponibilidad.some((b) => b.fecha === fecha);
 
-      return coincideTexto && coincideMateria && coincideBloque;
+      return coincideTexto && coincideMateria && coincideModalidad && coincideFecha;
     });
 
     const orden = fOrden.value;
@@ -201,6 +208,7 @@
           <ul class="pub-meta">
             <li>${icono("cap")}${escapeHTML(t.titulo)}</li>
             <li>${icono("pin")}${escapeHTML(t.lugar)}</li>
+            ${t.modalidad ? `<li>${icono("video")}${escapeHTML(t.modalidad)}</li>` : ""}
             ${prox ? `<li>${icono("clock")}Próximo: ${escapeHTML(fechaLegible(prox.fecha))} · ${escapeHTML(prox.horaInicio)}</li>` : ""}
           </ul>
           <p class="pub-score">${escapeHTML(textoCalificacion(t))}</p>
@@ -251,7 +259,7 @@
     } catch (_) { /* no es crítico */ }
 
     try {
-      const { auth, db } = await import("./firebase-config.js");
+      const { auth } = await import("./firebase-config.js");
       await auth.authStateReady();
 
       if (!auth.currentUser) {
@@ -259,14 +267,10 @@
         return;
       }
 
-      const { doc, getDoc } = await import(
-        "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"
-      );
-
+      const { api } = await import("./api.js");
       let rol = "estudiante";
       try {
-        const snap = await getDoc(doc(db, "usuarios", auth.currentUser.uid));
-        if (snap.exists()) rol = snap.data().rol || "estudiante";
+        rol = (await api.miPerfil()).rol || "estudiante";
       } catch (error) {
         console.warn("No se pudo leer el perfil:", error);
       }
@@ -300,6 +304,7 @@
     $("#pd-meta").innerHTML = `
       <li>${icono("cap")}${escapeHTML(tutor.titulo)}</li>
       <li>${icono("pin")}${escapeHTML(tutor.lugar)}</li>
+      ${tutor.modalidad ? `<li>${icono("video")}${escapeHTML(tutor.modalidad)}</li>` : ""}
       ${bloques}`;
 
     dialog.showModal();
@@ -354,6 +359,7 @@
 
   const params = new URLSearchParams(window.location.search);
   const materia = params.get("materia");
+  materiaPedida = materia; // se vuelve a aplicar cuando llega el catálogo completo
   const modalidad = params.get("modalidad");
   const fecha = params.get("disponibilidad");
 

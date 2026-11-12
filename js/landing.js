@@ -25,3 +25,15 @@ document.addEventListener("keydown", (event) => {
     setMenu(false);
   }
 });
+
+// Búsqueda rápida de la portada: las materias vienen de la API (las agrega el administrador).
+// Si no responde, se queda la lista que trae el HTML.
+const selectMateria = document.getElementById("materia");
+if (selectMateria) {
+  import("./materias.js")
+    .then(async (materias) => {
+      await materias.cargarMaterias();
+      materias.llenarSelectMaterias(selectMateria, { placeholder: "Buscar por materia" });
+    })
+    .catch(() => { /* se mantiene la lista del HTML */ });
+}

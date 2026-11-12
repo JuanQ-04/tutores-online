@@ -10,4 +10,10 @@ function plano(valor) {
 
 export const aObjeto = (doc) => ({ id: doc.id, ...plano(doc.data()) });
 
-export const porFechaDesc = (a, b) => String(b.creadaEn || "").localeCompare(String(a.creadaEn || ""));
+// Más reciente primero. Las colecciones usan «creadaEn» (solicitudes, tutorías, calificaciones)
+// o «creadoEn» (usuarios, mensajes de soporte).
+const marca = (x) => String(x.creadaEn || x.creadoEn || "");
+export const porFechaDesc = (a, b) => marca(b).localeCompare(marca(a));
+
+// Error de Firestore al crear un documento cuyo id ya existe.
+export const yaExiste = (error) => error.code === 6 || /ALREADY_EXISTS/.test(error.message || "");
